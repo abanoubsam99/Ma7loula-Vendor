@@ -1,0 +1,507 @@
+// import 'package:animated_rating_stars/animated_rating_stars.dart';
+import 'package:easy_localization/easy_localization.dart' as e;
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:flutter_svg/svg.dart';
+import 'package:ma7lola_vendor/core/generated/locale_keys.g.dart';
+import 'package:ma7lola_vendor/core/services/http/apis/miscellaneous_api.dart';
+import 'package:ma7lola_vendor/core/utils/colors_palette.dart';
+import 'package:ma7lola_vendor/core/utils/helpers.dart';
+import 'package:ma7lola_vendor/core/widgets/custom_app_bar.dart';
+import 'package:ma7lola_vendor/core/widgets/custom_card.dart';
+import 'package:sizer/sizer.dart';
+import 'package:url_launcher/url_launcher_string.dart';
+
+import '../../../../../../core/utils/assets_manager.dart';
+import '../../../../../../core/utils/font.dart';
+import '../../../../../../core/utils/util_values.dart';
+import '../../../../../model/emergency/order_details.dart';
+import '../my_orders_tab/local_widet/my_orders_card.dart';
+
+class EmergencyOrderDetails extends StatefulWidget {
+  const EmergencyOrderDetails({
+    Key? key,
+    required this.orderNum,
+    required this.vendorNum,
+    required this.vendorName,
+  }) : super(key: key);
+
+  final int orderNum;
+  final String vendorNum;
+  final String vendorName;
+
+  @override
+  State<EmergencyOrderDetails> createState() => _EmergencyOrderDetailsState();
+}
+
+class _EmergencyOrderDetailsState extends State<EmergencyOrderDetails> {
+  bool _isLoading = false;
+
+  String? address;
+  var prices;
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection:
+          Helpers.isArabic(context) ? TextDirection.rtl : TextDirection.ltr,
+      child: FutureBuilder<EmergencyOrderDetailsModel>(
+          future: MiscellaneousApi.getEmergencyOrderDetails(
+              locale: context.locale, id: widget.orderNum),
+          builder: (context, snapshot) {
+            if (snapshot.data == null) {
+              return Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(
+                    color: ColorsPalette.primaryColor,
+                  ),
+                ),
+              );
+            }
+
+            final emergencyOrderDetails = snapshot.data!;
+
+            if (emergencyOrderDetails.data == null) {
+              return SizedBox.shrink();
+            }
+            final order = emergencyOrderDetails.data?.order;
+            final color = _getColors(order);
+
+            return Scaffold(
+                backgroundColor: ColorsPalette.lightGrey,
+                appBar: AppBarApp(
+                  title: '${LocaleKeys.orderNumber.tr()} ${widget.orderNum}',
+                  actions: [
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      margin: EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                          color: color.first,
+                          borderRadius: BorderRadius.circular(25.sp)),
+                      child: Text(
+                        order?.status ?? '',
+                        style: TextStyle(
+                            color: ColorsPalette.black,
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w500,
+                            fontFamily: ZainTextStyles.font),
+                      ),
+                    ),
+                  ],
+                ),
+                body: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      UtilValues.gap12,
+                      _vendorCard(order?.worker?.name ?? '',
+                          order?.worker?.phone ?? ''),
+                      Container(
+                        decoration: BoxDecoration(
+                            color: ColorsPalette.white,
+                            borderRadius: BorderRadius.circular(10)),
+                        padding: EdgeInsets.all(10),
+                        margin: EdgeInsets.all(10),
+                        child: Row(
+                          children: [
+                            SvgPicture.asset(AssetsManager.carShape),
+                            UtilValues.gap8,
+                            Text(
+                              (order?.userCar != null)
+                                  ? '${order?.userCar?.car?.model?.brand?.name} ${order?.userCar?.car?.model?.name} ${order?.userCar?.car?.year}'
+                                  : '----',
+                              style: TextStyle(
+                                  color: ColorsPalette.black,
+                                  fontWeight: FontWeight.w400,
+                                  fontFamily: ZainTextStyles.font,
+                                  fontSize: 12.sp),
+                            ),
+                          ],
+                        ),
+                      ),
+                      UtilValues.gap8,
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              LocaleKeys.addressSelected.tr(),
+                              style: TextStyle(
+                                  color: ColorsPalette.black,
+                                  fontWeight: FontWeight.w400,
+                                  fontFamily: ZainTextStyles.font,
+                                  fontSize: 12.sp),
+                            ),
+                            UtilValues.gap4,
+                            CustomCard(
+                              color: ColorsPalette.white,
+                              child: Row(
+                                children: [
+                                  SvgPicture.asset(
+                                    AssetsManager.location,
+                                    color: ColorsPalette.primaryColor,
+                                    height: 15,
+                                  ),
+                                  UtilValues.gap4,
+                                  Expanded(
+                                    child: Text(
+                                      order?.location ?? '',
+                                      overflow: TextOverflow.ellipsis,
+
+                                      style: TextStyle(
+                                          color: ColorsPalette.black,
+                                          fontWeight: FontWeight.w600,
+                                          fontFamily: ZainTextStyles.font,
+                                          fontSize: 12.sp),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            UtilValues.gap8,
+                            if (order?.services != null &&
+                                (order?.services?.isNotEmpty ?? false)) ...[
+                              Text(
+                                LocaleKeys.listServices.tr(),
+                                style: TextStyle(
+                                    color: ColorsPalette.black,
+                                    fontWeight: FontWeight.w400,
+                                    fontFamily: ZainTextStyles.font,
+                                    fontSize: 12.sp),
+                              ),
+                              UtilValues.gap4,
+                              CustomCard(
+                                border: Border.all(color: ColorsPalette.grey),
+                                color: ColorsPalette.white,
+                                child: Column(
+                                  children: [
+                                    _emergencyOrderDetails(
+                                      order?.services?.first.name ?? '',
+                                      '${order?.services?.first.price} ${LocaleKeys.le.tr()}',
+                                    ),
+                                    _emergencyOrderDetails(
+                                      order?.services?.last.name ?? '',
+                                      '${order?.services?.last.price} ${LocaleKeys.le.tr()}',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              UtilValues.gap8,
+                            ],
+                            Text(
+                              LocaleKeys.paymentData.tr(),
+                              style: TextStyle(
+                                  color: ColorsPalette.black,
+                                  fontWeight: FontWeight.w400,
+                                  fontFamily: ZainTextStyles.font,
+                                  fontSize: 12.sp),
+                            ),
+                            UtilValues.gap4,
+                            CustomCard(
+                                border: Border.all(color: ColorsPalette.grey),
+                                color: ColorsPalette.white,
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          LocaleKeys.paymentMethod.tr(),
+                                          style: TextStyle(
+                                              color: ColorsPalette.customGrey,
+                                              fontWeight: FontWeight.w400,
+                                              fontFamily: ZainTextStyles.font,
+                                              fontSize: 12.sp),
+                                        ),
+                                        Spacer(),
+                                        Text(
+                                          (int.tryParse(order?.paymentMethod ??
+                                                          '') ==
+                                                      0 ||
+                                                  int.tryParse(order
+                                                              ?.paymentMethod ??
+                                                          '') ==
+                                                      2)
+                                              ? LocaleKeys.cash.tr()
+                                              : LocaleKeys.credit.tr(),
+                                          style: TextStyle(
+                                              color: ColorsPalette.black,
+                                              fontWeight: FontWeight.w600,
+                                              fontFamily: ZainTextStyles.font,
+                                              fontSize: 12.sp),
+                                        ),
+                                        UtilValues.gap4,
+                                        SvgPicture.asset(
+                                          (int.tryParse(order?.paymentMethod ??
+                                                          '') ==
+                                                      0 ||
+                                                  int.tryParse(order
+                                                              ?.paymentMethod ??
+                                                          '') ==
+                                                      2)
+                                              ? AssetsManager.cash
+                                              : AssetsManager.masterCard,
+                                        ),
+                                      ],
+                                    ),
+                                    _paymentDetails(
+                                      LocaleKeys.total.tr(),
+                                      Helpers.formatPrice(order?.total)
+                                          .toString(),
+                                    ),
+                                  ],
+                                )),
+                          ],
+                        ),
+                      ),
+                      UtilValues.gap8,
+                      if (order?.rate != null) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Text(
+                            LocaleKeys.rate.tr(),
+                            style: TextStyle(
+                                color: ColorsPalette.black,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: ZainTextStyles.font,
+                                fontSize: 12.sp),
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8.0),
+                          child: CustomCard(
+                              border: Border.all(color: ColorsPalette.grey),
+                              color: ColorsPalette.white,
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        LocaleKeys.rateService.tr(),
+                                        style: TextStyle(
+                                            color: ColorsPalette.customGrey,
+                                            fontWeight: FontWeight.w400,
+                                            fontFamily: ZainTextStyles.font,
+                                            fontSize: 12.sp),
+                                      ),
+                                      Spacer(),
+                                      RatingBarIndicator(
+                                        rating: double.tryParse(order?.rate?.services?.toString() ?? '') ?? 0.0,
+                                        itemBuilder: (context, index) => Icon(
+                                          Icons.star,
+                                          color: Colors.amber,
+                                        ),
+                                        unratedColor: Colors.grey,
+                                        itemCount: 5,
+                                        itemSize: 15.0,
+                                        direction: Axis.horizontal,
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        (double.tryParse(order?.rate?.services?.toString() ?? '') ?? 0.0)
+                                            .toStringAsFixed(1),
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                      // AnimatedRatingStars(
+                                      //   readOnly: true,
+                                      //   initialRating: double.parse(
+                                      //       order?.rate?.services?.toString() ??
+                                      //           ''),
+                                      //   onChanged: (rating) {},
+                                      //   displayRatingValue:
+                                      //       true, // Display the rating value
+                                      //   interactiveTooltips:
+                                      //       true, // Allow toggling half-star state
+                                      //   customFilledIcon: Icons.star,
+                                      //   customHalfFilledIcon: Icons.star_half,
+                                      //   customEmptyIcon: Icons.star_border,
+                                      //   starSize: 15.0,
+                                      //   animationDuration:
+                                      //       const Duration(milliseconds: 500),
+                                      //   animationCurve: Curves.easeInOut,
+                                      // ),
+                                    ],
+                                  ),
+                                ],
+                              )),
+                        ),
+                      ],
+                    ],
+                  ),
+                ));
+          }),
+    );
+  }
+
+  _paymentDetails(String text, String num) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          text,
+          style: TextStyle(
+              color: ColorsPalette.customGrey,
+              fontWeight: FontWeight.w400,
+              fontFamily: ZainTextStyles.font,
+              fontSize: 12.sp),
+        ),
+        Spacer(),
+        Text(
+          num.toString(),
+          style: TextStyle(
+              color: ColorsPalette.black,
+              fontWeight: FontWeight.w600,
+              fontFamily: ZainTextStyles.font,
+              fontSize: 12.sp),
+        ),
+        UtilValues.gap4,
+        Text(
+          LocaleKeys.le.tr(),
+          style: TextStyle(
+              color: ColorsPalette.customGrey,
+              fontWeight: FontWeight.w400,
+              fontFamily: ZainTextStyles.font,
+              fontSize: 12.sp),
+        ),
+      ],
+    );
+  }
+
+  _emergencyOrderDetails(String text, String date) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          text,
+          style: TextStyle(
+              color: ColorsPalette.customGrey,
+              fontWeight: FontWeight.w400,
+              fontFamily: ZainTextStyles.font,
+              fontSize: 12.sp),
+        ),
+        Spacer(),
+        Text(
+          date,
+          style: TextStyle(
+              color: ColorsPalette.black,
+              fontWeight: FontWeight.w600,
+              fontFamily: ZainTextStyles.font,
+              fontSize: 12.sp),
+        ),
+      ],
+    );
+  }
+
+  _vendorCard(String vendorName, String vendorNum) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 8),
+      height: 80,
+      width: MediaQuery.of(context).size.width,
+      decoration: BoxDecoration(
+          color: ColorsPalette.white,
+          borderRadius: UtilValues.borderRadius10,
+          border: Border.all(color: ColorsPalette.border2)),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.only(
+                topRight: Radius.circular(10),
+                bottomRight: Radius.circular(10)),
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: SvgPicture.asset(
+                AssetsManager.userPic,
+                width: MediaQuery.of(context).size.width * .2,
+                fit: BoxFit.fill,
+              ),
+            ),
+          ),
+          UtilValues.gap12,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              UtilValues.gap8,
+              Text(
+                vendorName,
+                style: const TextStyle(
+                    color: ColorsPalette.black,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: ZainTextStyles.font),
+              ),
+              UtilValues.gap8,
+              SizedBox(
+                height: 20,
+                width: MediaQuery.of(context).size.width * .57,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      vendorNum,
+                      style: const TextStyle(
+                          color: ColorsPalette.black,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: ZainTextStyles.font),
+                    ),
+                    Spacer(),
+                    Row(
+                      children: [
+                        InkWell(
+                            onTap: () => _callVendor(vendorNum),
+                            child: SvgPicture.asset(
+                              AssetsManager.phone,
+                            )),
+                        UtilValues.gap24,
+                        InkWell(
+                            onTap: () => _openSmsChat(vendorNum),
+                            child: Icon(
+                              CupertinoIcons.chat_bubble_text,
+                              size: 17,
+                            )),
+                      ],
+                    )
+                  ],
+                ),
+              ),
+            ],
+          ),
+          UtilValues.gap4
+        ],
+      ),
+    );
+  }
+
+  void _callVendor(String vendorNum) async {
+    await launchUrlString("tel://$vendorNum");
+  }
+
+  void _openSmsChat(String vendorNum) async {
+    await launchUrlString("sms://$vendorNum");
+  }
+
+  List<Color> _getColors(EmergencyOrder? order) {
+    switch (order?.status) {
+      case OrderStatus.ORDER_CANCELLED:
+      case OrderStatus.ORDER_ON_THE_RUN:
+        return [ColorsPalette.yellow];
+
+      case OrderStatus.ORDER_DELIVERED:
+      case OrderStatus.ORDER_COMPELETED:
+        return [ColorsPalette.lightGreen];
+
+      case OrderStatus.ORDER_PREPARING:
+      case OrderStatus.ORDER_NEW:
+        return [ColorsPalette.lightBlue];
+
+      default:
+        return [ColorsPalette.lightpre];
+    }
+  }
+}
