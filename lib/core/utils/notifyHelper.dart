@@ -141,24 +141,24 @@ class NotificationsHelper {
             builder: (context) => OrderDetails(orderNum: int.parse(message.data['order_id'].toString()),orderType: 0,),
           ),
         );
-        _showFullScreenOrderAlert(message.notification!);
-      } else if (message.notification != null&&message.data["status"]) {
+        _showFullScreenOrderAlert(message.data!);
+      } else if (message.data != null&&message.data["status"]) {
         // Backup
-        _showFullScreenOrderAlert(message.notification!);
+        _showFullScreenOrderAlert(message.data!);
       }
     }
   }
 
   /// Handle incoming FCM notifications when the app is in the foreground
   void _handleIncomingNotification(RemoteMessage message) {
-    if (message.notification!=null) {
+    if (message.data!=null) {
       _handleDataMessage(message.notification!);
     }
   }
 
   /// Handle FCM data messages (background or foreground)
   void _handleDataMessage(RemoteNotification data) {
-    _showFullScreenOrderAlert(data);
+    // _showFullScreenOrderAlert(data);
 
     // // التحقق من نوع الإشعار
     // // final notificationType = _getNotificationType(data);
@@ -186,24 +186,37 @@ class NotificationsHelper {
   // }
 
   /// عرض Full Screen Alert للطلب الجديد
-  void _showFullScreenOrderAlert(RemoteNotification data) {
+  void _showFullScreenOrderAlert(Map<String, dynamic> data) {
     final context = navigatorKey.currentContext;
     if (context != null) {
       // استخراج order_id من الإشعار
-      final orderId = _extractOrderId(data.title);
+      // final orderId = _extractOrderId(data.title);
       
       // // محاولة إيجاد OrderModel من القائمة
       // OrderModel? orderModel = _findOrderModel(orderId);
       //
+      if(data!=null)
       // فتح شاشة Full Screen Alert
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => OrderAlertScreen(
-            orderId: orderId,
-            orderReference: data.title ?? 'N/A',
-            customerName: _extractCustomerName(data.body),
-            location: _extractLocation(data.body),
-            orderDetails: data.body,
+            notificationData: NotificationData(
+                eventType: '${data["event_type"].toString()}',
+                actionRequiredFor: '${data["action_required_for"].toString()}',
+                kind: '${data["kind"].toString()}',
+                orderId: '${data["order_id"].toString()}',
+                status: '${data["status"].toString()}',
+                orderVendorStatus: '${data["order_vendor_status"].toString()}',
+                orderVendorId: '${data["order_vendor_id"].toString()}',
+                type: '${data["type"].toString()}',
+                offeredTotal: '${data["offered_total"].toString()}',
+                vendorId: '${data["vendor_id"].toString()}'
+            ),
+            orderId: "${data["order_id"].toString()}",
+            orderReference: data["title"] ?? 'N/A',
+            customerName: _extractCustomerName(data["body"]),
+            location: _extractLocation(data["body"]),
+            orderDetails: data["body"],
             // orderModel: orderModel, // تمرير OrderModel إذا وُجد
           ),
           fullscreenDialog: true,
@@ -212,7 +225,7 @@ class NotificationsHelper {
     }
     
     // عرض notification عادي كـ backup
-    _showHighPriorityNotification(data.title, data.body, 'order');
+    _showHighPriorityNotification("${data["title"]}", "${data["body"]}", 'order');
   }
 
   /// عرض Full Screen Alert للزيارة
@@ -350,7 +363,7 @@ class NotificationsHelper {
       fullScreenIntent: true, // مهم جداً للأندرويد
       category: AndroidNotificationCategory.alarm,
       ticker: isVisit ? 'موعد زيارة قريب' : 'طلب توصيل جديد',
-      // sound: RawResourceAndroidNotificationSound('order_alert'),
+ //     sound: RawResourceAndroidNotificationSound('order_alert'),
       styleInformation: BigTextStyleInformation(
         body ?? '',
         contentTitle: title,
@@ -361,8 +374,8 @@ class NotificationsHelper {
     const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentSound: true,
-      presentBadge: true,
-      sound: 'order_alert.caf', // صوت مخصص لـ iOS
+      presentBadge: true, 
+      //sound: 'order_alert.caf', // صوت مخصص لـ iOS
       categoryIdentifier: 'ALERT_CATEGORY',
       interruptionLevel: InterruptionLevel.critical, // مهم جداً لـ iOS
     );

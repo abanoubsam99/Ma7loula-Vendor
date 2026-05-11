@@ -1,14 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ma7lola_vendor/core/widgets/responsive_helper.dart';
+import 'package:ma7lola/core/widgets/responsive_helper.dart';
 
-import '../../model/order_details_model.dart';
-// import 'package:rider/models/order/order_model.dart';
-// import 'package:audioplayers/audioplayers.dart';
-// import 'package:rider/helpers/responsive_helper.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎨 App Theme
@@ -24,7 +20,6 @@ class AppTheme {
   static const Color white = Colors.white;
   static const Color cyan = Color(0xFF28E6C5);
 
-  // Dark Mode
   static const Color darkBackground = Color(0xFF0A0A12);
   static const Color darkCard = Color(0xFF14141F);
   static const Color darkSurface = Color(0xFF1E1E2D);
@@ -32,7 +27,6 @@ class AppTheme {
   static const Color darkText = Color(0xFFF5F5F7);
   static const Color darkTextSecondary = Color(0xFF8E8EA0);
 
-  // Light Mode
   static const Color lightBackground = Color(0xFFF8F9FC);
   static const Color lightCard = Color(0xFFFFFFFF);
   static const Color lightSurface = Color(0xFFF1F3F8);
@@ -132,23 +126,102 @@ class AnimatedBuilder extends AnimatedWidget {
   Widget build(BuildContext context) => builder(context, child);
 }
 
-/// 🚨 شاشة Full Screen Alert لطلبات التوصيل الجديدة
-/// تظهر فوق كل شيء وتعمل في Background/Foreground/Terminated
-class OrderAlertScreen extends StatefulWidget {
+// ═══════════════════════════════════════════════════════════════════════════
+// 📦 Notification Data Model
+// ═══════════════════════════════════════════════════════════════════════════
+class NotificationData {
+  final String eventType;
+  final String actionRequiredFor;
+  final String kind;
   final String orderId;
-  final String orderReference;
-  final String customerName;
-  final String location;
+  final String status;
+  final String orderVendorStatus;
+  final String orderVendorId;
+  final String type;
+  final String offeredTotal;
+  final String vendorId;
+
+  const NotificationData({
+    required this.eventType,
+    required this.actionRequiredFor,
+    required this.kind,
+    required this.orderId,
+    required this.status,
+    required this.orderVendorStatus,
+    required this.orderVendorId,
+    required this.type,
+    required this.offeredTotal,
+    required this.vendorId,
+  });
+
+  factory NotificationData.fromMap(Map<String, dynamic> data) {
+    return NotificationData(
+      eventType: data['event_type'] ?? '',
+      actionRequiredFor: data['action_required_for'] ?? '',
+      kind: data['kind'] ?? '',
+      orderId: data['order_id'] ?? '',
+      status: data['status'] ?? '',
+      orderVendorStatus: data['order_vendor_status'] ?? '',
+      orderVendorId: data['order_vendor_id'] ?? '',
+      type: data['type'] ?? '',
+      offeredTotal: data['offered_total'] ?? '',
+      vendorId: data['vendor_id'] ?? '',
+    );
+  }
+}
+
+/// 🚨 Full Screen Alert Screen for new delivery/vendor offer notifications
+class OrderAlertScreen extends StatefulWidget {
+  // --- Legacy fields (optional, kept for backward compatibility) ---
+  final String? orderId;
+  final String? orderReference;
+  final String? customerName;
+  final String? location;
   final String? orderDetails;
+
+  // --- NEW: FCM notification data ---
+  final String? notificationTitle;
+  final String? notificationBody;
+  final NotificationData? notificationData;
+
+  // --- Callbacks for accept / reject ---
+  final Future<void> Function()? onAccept;
+  final Future<void> Function()? onReject;
 
   const OrderAlertScreen({
     Key? key,
-    required this.orderId,
-    required this.orderReference,
-    required this.customerName,
-    required this.location,
+    // legacy
+    this.orderId,
+    this.orderReference,
+    this.customerName,
+    this.location,
     this.orderDetails,
+    // new
+    this.notificationTitle,
+    this.notificationBody,
+    this.notificationData,
+    this.onAccept,
+    this.onReject,
   }) : super(key: key);
+
+  /// Convenience constructor for FCM payloads
+  factory OrderAlertScreen.fromFcm({
+    Key? key,
+    required String notificationTitle,
+    required String notificationBody,
+    required Map<String, dynamic> data,
+    Future<void> Function()? onAccept,
+    Future<void> Function()? onReject,
+  }) {
+    return OrderAlertScreen(
+      key: key,
+      notificationTitle: notificationTitle,
+      notificationBody: notificationBody,
+      notificationData: NotificationData.fromMap(data),
+      onAccept: onAccept,
+      onReject: onReject,
+    );
+  }
 
   @override
   State<OrderAlertScreen> createState() => _OrderAlertScreenState();
@@ -166,9 +239,40 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   late AudioPlayer _audioPlayer;
 
   int _remainingSeconds = 30;
-  // تم إزالة _isAccepting و _isDeclining - لم تعد مطلوبة
+  bool _isAccepting = false;
+  bool _isRejecting = false;
 
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+
+  // Helpers to read data from either legacy fields or FCM payload
+  String get _displayOrderId =>
+      widget.notificationData?.orderId ?? widget.orderId ?? '-';
+
+  String get _displayType =>
+      widget.notificationData?.type ?? '-';
+
+  String get _displayEventType =>
+      widget.notificationData?.eventType ?? '-';
+
+  String get _displayActionRequiredFor =>
+      widget.notificationData?.actionRequiredFor ?? '-';
+
+  String get _displayKind =>
+      widget.notificationData?.kind ?? '-';
+
+  String get _displayOfferedTotal =>
+      widget.notificationData?.offeredTotal != null &&
+          widget.notificationData!.offeredTotal.isNotEmpty
+          ? '${widget.notificationData!.offeredTotal} SAR'
+          : '-';
+
+  String get _displayTitle =>
+      widget.notificationTitle ?? '🚨 طلب توصيل جديد!';
+
+  String get _displayBody =>
+      widget.notificationBody ??
+          widget.orderDetails ??
+          'لديك طلب جديد يحتاج منك الموافقة';
 
   @override
   void initState() {
@@ -194,8 +298,9 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
       vsync: this,
     );
 
+    // ✅ Fixed: 30 seconds ring duration
     _ringController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(seconds: 30),
       vsync: this,
     );
 
@@ -213,7 +318,8 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
 
     _pulseController.repeat(reverse: true);
     _floatController.repeat(reverse: true);
-    _ringController.repeat();
+    // Ring expands once over 30 s then stops (mirrors the countdown)
+    _ringController.forward();
   }
 
   void _startCountdown() {
@@ -228,13 +334,12 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
 
   void _playAlarmSound() async {
     _audioPlayer = AudioPlayer();
-
     try {
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       await _audioPlayer.setVolume(1.0);
       await _audioPlayer.play(AssetSource('sounds/order_alert.mp3'));
     } catch (e) {
-      print('❌ خطأ في تشغيل الصوت: $e');
+      debugPrint('❌ خطأ في تشغيل الصوت: $e');
       HapticFeedback.vibrate();
     }
   }
@@ -247,18 +352,58 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   void _handleTimeout() {
     _stopAlarmSound();
     _countdownTimer.cancel();
-    Navigator.of(context).pop();
-    _sendTimeoutNotification();
+    if (mounted) Navigator.of(context).pop();
+    debugPrint('⏰ انتهى الوقت للطلب: $_displayOrderId');
   }
 
-  void _sendTimeoutNotification() {
-    print('⏰ انتهى الوقت للطلب: ${widget.orderId}');
+  Future<void> _handleAccept() async {
+    if (_isAccepting || _isRejecting) return;
+    setState(() => _isAccepting = true);
+    HapticFeedback.mediumImpact();
+    try {
+      if (widget.onAccept != null) {
+        await widget.onAccept!();
+      }
+      _stopAlarmSound();
+      _countdownTimer.cancel();
+      if (mounted) {
+        _showSuccessSnackBar('✅ تم قبول الطلب بنجاح');
+        await Future.delayed(const Duration(milliseconds: 600));
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isAccepting = false);
+        _showErrorSnackBar('حدث خطأ أثناء قبول الطلب');
+      }
+    }
   }
 
-  // تم إزالة دوال _handleAccept و _handleDecline
-  // المندوب الآن يفتح التطبيق ويقبل الطلب من شاشة الطلبات
+  Future<void> _handleReject() async {
+    if (_isAccepting || _isRejecting) return;
+    setState(() => _isRejecting = true);
+    HapticFeedback.mediumImpact();
+    try {
+      if (widget.onReject != null) {
+        await widget.onReject!();
+      }
+      _stopAlarmSound();
+      _countdownTimer.cancel();
+      if (mounted) {
+        _showErrorSnackBar('❌ تم رفض الطلب');
+        await Future.delayed(const Duration(milliseconds: 600));
+        Navigator.of(context).pop(false);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isRejecting = false);
+        _showErrorSnackBar('حدث خطأ أثناء رفض الطلب');
+      }
+    }
+  }
 
   void _showErrorSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -285,6 +430,7 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   }
 
   void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -345,19 +491,10 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
             ),
             child: Stack(
               children: [
-                // Background Effects
                 _buildBackgroundEffects(size),
-
-                // Floating Particles
                 _buildFloatingParticles(size),
-
-                // Decorative Lines
                 _buildDecorativeLines(size),
-
-                // Animated Rings
                 _buildAnimatedRings(size),
-
-                // Main Content
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.all(24.0),
@@ -367,11 +504,11 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
                         children: [
                           _buildHeader(),
                           const SizedBox(height: 32),
-                          _buildOrderInfo(),
-                          const SizedBox(height: 32),
+                          _buildNotificationInfo(),   // ✅ NEW FCM data section
+                          const SizedBox(height: 24),
                           _buildCountdownTimer(),
                           const SizedBox(height: 32),
-                          _buildActionButtons(),
+                          _buildActionButtons(),       // ✅ Accept / Reject
                           const SizedBox(height: 20),
                         ],
                       ),
@@ -387,90 +524,79 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  // 🎨 Background Effects
+  // 🎨 Background Effects (unchanged)
   // ═══════════════════════════════════════════════════════════════════════
   Widget _buildBackgroundEffects(Size size) {
     return Stack(
       children: [
-        // Top Right Glow
         Positioned(
           top: -size.height * 0.1,
           right: -size.width * 0.3,
           child: AnimatedBuilder(
             animation: _pulseAnimation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _pulseAnimation.value,
-                child: Container(
-                  width: size.width * 0.7,
-                  height: size.width * 0.7,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        AppTheme.primary.withOpacity(_isDark ? 0.25 : 0.15),
-                        AppTheme.primary.withOpacity(0.08),
-                        AppTheme.primary.withOpacity(0),
-                      ],
-                    ),
+            builder: (context, child) => Transform.scale(
+              scale: _pulseAnimation.value,
+              child: Container(
+                width: size.width * 0.7,
+                height: size.width * 0.7,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppTheme.primary.withOpacity(_isDark ? 0.25 : 0.15),
+                      AppTheme.primary.withOpacity(0.08),
+                      AppTheme.primary.withOpacity(0),
+                    ],
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           ),
         ),
-
-        // Bottom Left Glow
         Positioned(
           bottom: -size.height * 0.05,
           left: -size.width * 0.2,
           child: AnimatedBuilder(
             animation: _pulseAnimation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: 2 - _pulseAnimation.value,
-                child: Container(
-                  width: size.width * 0.5,
-                  height: size.width * 0.5,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        AppTheme.secondary.withOpacity(_isDark ? 0.2 : 0.1),
-                        AppTheme.secondary.withOpacity(0),
-                      ],
-                    ),
+            builder: (context, child) => Transform.scale(
+              scale: 2 - _pulseAnimation.value,
+              child: Container(
+                width: size.width * 0.5,
+                height: size.width * 0.5,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppTheme.secondary.withOpacity(_isDark ? 0.2 : 0.1),
+                      AppTheme.secondary.withOpacity(0),
+                    ],
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           ),
         ),
-
-        // Center Alert Glow
         Positioned(
           top: size.height * 0.15,
           left: size.width * 0.1,
           child: AnimatedBuilder(
             animation: _floatAnimation,
-            builder: (context, child) {
-              return Transform.translate(
-                offset: Offset(_floatAnimation.value, _floatAnimation.value * 0.5),
-                child: Container(
-                  width: size.width * 0.3,
-                  height: size.width * 0.3,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        AppTheme.accent.withOpacity(_isDark ? 0.15 : 0.08),
-                        AppTheme.accent.withOpacity(0),
-                      ],
-                    ),
+            builder: (context, child) => Transform.translate(
+              offset: Offset(_floatAnimation.value, _floatAnimation.value * 0.5),
+              child: Container(
+                width: size.width * 0.3,
+                height: size.width * 0.3,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppTheme.accent.withOpacity(_isDark ? 0.15 : 0.08),
+                      AppTheme.accent.withOpacity(0),
+                    ],
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           ),
         ),
       ],
@@ -488,15 +614,12 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
             final y = random.nextDouble() * size.height;
             final particleSize = 3 + random.nextDouble() * 6;
             final delay = random.nextDouble();
-
             final color = index % 3 == 0
                 ? AppTheme.accent
                 : (index % 3 == 1 ? AppTheme.primary : AppTheme.secondary);
-
             return Positioned(
               left: x,
-              top: y +
-                  (_floatAnimation.value * (index.isEven ? 1 : -1) * delay),
+              top: y + (_floatAnimation.value * (index.isEven ? 1 : -1) * delay),
               child: Container(
                 width: particleSize,
                 height: particleSize,
@@ -519,9 +642,7 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
 
   Widget _buildDecorativeLines(Size size) {
     return Positioned.fill(
-      child: CustomPaint(
-        painter: _LinesPainter(isDark: _isDark),
-      ),
+      child: CustomPaint(painter: _LinesPainter(isDark: _isDark)),
     );
   }
 
@@ -554,24 +675,23 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // 🔔 Header
+  // ═══════════════════════════════════════════════════════════════════════
   Widget _buildHeader() {
     return Column(
       children: [
-        // Animated Icon
         AnimatedBuilder(
           animation: _floatAnimation,
-          builder: (context, child) {
-            return Transform.translate(
-              offset: Offset(0, _floatAnimation.value * 0.5),
-              child: child,
-            );
-          },
+          builder: (context, child) => Transform.translate(
+            offset: Offset(0, _floatAnimation.value * 0.5),
+            child: child,
+          ),
           child: ScaleTransition(
             scale: _pulseAnimation,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Outer Glow Ring
                 Container(
                   width: 140,
                   height: 140,
@@ -585,7 +705,6 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
                     ),
                   ),
                 ),
-                // Main Icon Container
                 Container(
                   width: 110,
                   height: 110,
@@ -601,12 +720,11 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
                     ],
                   ),
                   child: const Icon(
-                    Icons.shopping_bag_rounded,
+                    Icons.local_offer_rounded,
                     size: 50,
                     color: AppTheme.white,
                   ),
                 ),
-                // Badge
                 Positioned(
                   bottom: 0,
                   right: 10,
@@ -639,13 +757,11 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
           ),
         ),
         const SizedBox(height: 28),
-
-        // Title with Gradient
         ShaderMask(
           shaderCallback: (bounds) =>
               AppTheme.primaryGradient.createShader(bounds),
           child: Text(
-            '🚨 طلب توصيل جديد!',
+            _displayTitle,
             style: TextStyle(
               fontSize: ResponsiveHelper.fontDisplay,
               fontWeight: FontWeight.bold,
@@ -655,19 +771,15 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
           ),
         ),
         const SizedBox(height: 12),
-
-        // Subtitle
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             color: AppTheme.primary.withOpacity(_isDark ? 0.15 : 0.1),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: AppTheme.primary.withOpacity(0.2),
-            ),
+            border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
           ),
           child: Text(
-            'لديك طلب جديد يحتاج منك الموافقة',
+            _displayBody,
             style: TextStyle(
               fontSize: ResponsiveHelper.fontLarge,
               color: AppTheme.getTextSecondary(_isDark),
@@ -680,50 +792,156 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
     );
   }
 
-  Widget _buildOrderInfo() {
+  // ═══════════════════════════════════════════════════════════════════════
+  // 📦 Notification Info (FCM data fields)
+  // ═══════════════════════════════════════════════════════════════════════
+  Widget _buildNotificationInfo() {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.getCard(_isDark),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: AppTheme.getBorder(_isDark),
-        ),
+        border: Border.all(color: AppTheme.getBorder(_isDark)),
         boxShadow: AppTheme.softShadow(_isDark),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Section title
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [
+                    AppTheme.primary.withOpacity(0.2),
+                    AppTheme.primary.withOpacity(0.1),
+                  ]),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.info_outline_rounded,
+                    color: AppTheme.primary, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'تفاصيل الإشعار',
+                style: TextStyle(
+                  fontSize: ResponsiveHelper.fontHeadingSmall,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.getText(_isDark),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Order ID
           _buildInfoRow(
             icon: Icons.tag_rounded,
             label: 'رقم الطلب',
-            value: '#${widget.orderReference}',
+            value: '#$_displayOrderId',
             color: AppTheme.primary,
           ),
           _buildDivider(),
+
+          // Type
           _buildInfoRow(
-            icon: Icons.person_rounded,
-            label: 'العميل',
-            value: widget.customerName,
+            icon: Icons.category_rounded,
+            label: 'النوع',
+            value: _displayType,
+            color: AppTheme.cyan,
+          ),
+          _buildDivider(),
+
+          // Event Type
+          _buildInfoRow(
+            icon: Icons.event_rounded,
+            label: 'نوع الحدث',
+            value: _displayEventType,
+            color: AppTheme.accent,
+          ),
+          _buildDivider(),
+
+          // Kind
+          _buildInfoRow(
+            icon: Icons.label_rounded,
+            label: 'التصنيف',
+            value: _displayKind,
+            color: AppTheme.info,
+          ),
+          _buildDivider(),
+
+          // Action Required For
+          _buildInfoRow(
+            icon: Icons.person_pin_rounded,
+            label: 'مطلوب من',
+            value: _displayActionRequiredFor,
             color: AppTheme.secondary,
           ),
           _buildDivider(),
-          _buildInfoRow(
-            icon: Icons.location_on_rounded,
-            label: 'الموقع',
-            value: widget.location,
-            maxLines: 2,
-            color: AppTheme.cyan,
-          ),
-          if (widget.orderDetails != null) ...[
-            _buildDivider(),
-            _buildInfoRow(
-              icon: Icons.info_outline_rounded,
-              label: 'التفاصيل',
-              value: widget.orderDetails!,
-              maxLines: 2,
-              color: AppTheme.accent,
-            ),
+
+          // Offered Total  ← highlighted prominently
+          _buildOfferedTotalRow(),
+        ],
+      ),
+    );
+  }
+
+  /// Special highlighted row for the offered price
+  Widget _buildOfferedTotalRow() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.secondary.withOpacity(_isDark ? 0.2 : 0.12),
+            AppTheme.secondary.withOpacity(_isDark ? 0.1 : 0.06),
           ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.secondary.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.secondary.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(Icons.attach_money_rounded,
+                color: AppTheme.secondary,
+                size: ResponsiveHelper.iconLarge),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'السعر المعروض',
+                  style: TextStyle(
+                    fontSize: ResponsiveHelper.fontMedium,
+                    color: AppTheme.getTextSecondary(_isDark),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                ShaderMask(
+                  shaderCallback: (bounds) =>
+                      AppTheme.secondaryGradient.createShader(bounds),
+                  child: Text(
+                    _displayOfferedTotal,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -732,7 +950,7 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   Widget _buildDivider() {
     return Container(
       height: 1,
-      margin: const EdgeInsets.symmetric(vertical: 16),
+      margin: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -764,9 +982,7 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
               ],
             ),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: color.withOpacity(0.15),
-            ),
+            border: Border.all(color: color.withOpacity(0.15)),
           ),
           child: Icon(icon, color: color, size: ResponsiveHelper.iconLarge),
         ),
@@ -801,6 +1017,9 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // ⏱ Countdown Timer (unchanged logic, uses 30 s)
+  // ═══════════════════════════════════════════════════════════════════════
   Widget _buildCountdownTimer() {
     final progress = _remainingSeconds / 30;
     final isUrgent = _remainingSeconds <= 10;
@@ -850,7 +1069,6 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
           Stack(
             alignment: Alignment.center,
             children: [
-              // Outer Ring
               SizedBox(
                 width: 130,
                 height: 130,
@@ -864,7 +1082,6 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
                   strokeCap: StrokeCap.round,
                 ),
               ),
-              // Inner Content
               Container(
                 width: 100,
                 height: 100,
@@ -882,21 +1099,19 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
                   children: [
                     AnimatedBuilder(
                       animation: _pulseAnimation,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: isUrgent ? _pulseAnimation.value : 1.0,
-                          child: Text(
-                            '$_remainingSeconds',
-                            style: TextStyle(
-                              fontSize: 40,
-                              fontWeight: FontWeight.bold,
-                              color: isUrgent
-                                  ? AppTheme.error
-                                  : AppTheme.getText(_isDark),
-                            ),
+                      builder: (context, child) => Transform.scale(
+                        scale: isUrgent ? _pulseAnimation.value : 1.0,
+                        child: Text(
+                          '$_remainingSeconds',
+                          style: TextStyle(
+                            fontSize: 40,
+                            fontWeight: FontWeight.bold,
+                            color: isUrgent
+                                ? AppTheme.error
+                                : AppTheme.getText(_isDark),
                           ),
-                        );
-                      },
+                        ),
+                      ),
                     ),
                     Text(
                       'ثانية',
@@ -917,18 +1132,14 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
               decoration: BoxDecoration(
                 color: AppTheme.error.withOpacity(_isDark ? 0.15 : 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppTheme.error.withOpacity(0.3),
-                ),
+                border: Border.all(color: AppTheme.error.withOpacity(0.3)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.warning_rounded,
-                    color: AppTheme.error,
-                    size: ResponsiveHelper.iconSmall,
-                  ),
+                  Icon(Icons.warning_rounded,
+                      color: AppTheme.error,
+                      size: ResponsiveHelper.iconSmall),
                   const SizedBox(width: 8),
                   Text(
                     'الوقت على وشك الانتهاء!',
@@ -947,35 +1158,54 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // ✅ Accept / ❌ Reject buttons
+  // ═══════════════════════════════════════════════════════════════════════
   Widget _buildActionButtons() {
     return Column(
       children: [
-        // نص توضيحي
-        Text(
-          'افتح التطبيق لقبول أو رفض الطلب',
-          style: TextStyle(
-            fontSize: 14,
-            color: AppTheme.getTextSecondary(_isDark),
-            fontWeight: FontWeight.w500,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 16),
-        // زر إلغاء التنبيه
+        // Accept
         SizedBox(
           width: double.infinity,
           child: _ActionButton(
-            onPressed: () => Navigator.of(context).pop(),
-            label: 'إلغاء التنبيه',
-            icon: Icons.clear_rounded,
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.getTextSecondary(_isDark).withOpacity(0.3),
-                AppTheme.getTextSecondary(_isDark).withOpacity(0.2),
-              ],
-            ),
-            isLoading: false,
+            onPressed: _isAccepting || _isRejecting ? null : _handleAccept,
+            label: 'قبول العرض',
+            icon: Icons.check_circle_rounded,
+            gradient: AppTheme.secondaryGradient,
+            isLoading: _isAccepting,
             isDark: _isDark,
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Reject
+        SizedBox(
+          width: double.infinity,
+          child: _ActionButton(
+            onPressed: _isAccepting || _isRejecting ? null : _handleReject,
+            label: 'رفض العرض',
+            icon: Icons.cancel_rounded,
+            gradient: AppTheme.errorGradient,
+            isLoading: _isRejecting,
+            isDark: _isDark,
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Dismiss alert only (no action)
+        TextButton(
+          onPressed: () {
+            _stopAlarmSound();
+            _countdownTimer.cancel();
+            Navigator.of(context).pop();
+          },
+          child: Text(
+            'إغلاق التنبيه فقط',
+            style: TextStyle(
+              fontSize: ResponsiveHelper.fontMedium,
+              color: AppTheme.getTextSecondary(_isDark),
+              decoration: TextDecoration.underline,
+            ),
           ),
         ),
       ],
@@ -988,7 +1218,6 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
 // ═══════════════════════════════════════════════════════════════════════════
 class _LinesPainter extends CustomPainter {
   final bool isDark;
-
   _LinesPainter({required this.isDark});
 
   @override
@@ -997,13 +1226,8 @@ class _LinesPainter extends CustomPainter {
       ..color = AppTheme.primary.withOpacity(isDark ? 0.03 : 0.02)
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
-
     for (double i = -size.height; i < size.width + size.height; i += 50) {
-      canvas.drawLine(
-        Offset(i, 0),
-        Offset(i + size.height, size.height),
-        paint,
-      );
+      canvas.drawLine(Offset(i, 0), Offset(i + size.height, size.height), paint);
     }
   }
 
@@ -1012,7 +1236,7 @@ class _LinesPainter extends CustomPainter {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🔘 Action Button
+// 🔘 Action Button (unchanged)
 // ═══════════════════════════════════════════════════════════════════════════
 class _ActionButton extends StatefulWidget {
   final VoidCallback? onPressed;
@@ -1085,16 +1309,23 @@ class _ActionButtonState extends State<_ActionButton>
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 18),
           decoration: BoxDecoration(
-            gradient: widget.gradient,
+            gradient: widget.onPressed != null
+                ? widget.gradient
+                : LinearGradient(colors: [
+              Colors.grey.withOpacity(0.3),
+              Colors.grey.withOpacity(0.2),
+            ]),
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [
+            boxShadow: widget.onPressed != null
+                ? [
               BoxShadow(
                 color: widget.gradient.colors.first
                     .withOpacity(_isPressed ? 0.3 : 0.5),
                 blurRadius: _isPressed ? 15 : 25,
                 offset: Offset(0, _isPressed ? 5 : 10),
               ),
-            ],
+            ]
+                : [],
           ),
           child: widget.isLoading
               ? const Center(
@@ -1103,18 +1334,17 @@ class _ActionButtonState extends State<_ActionButton>
               height: 24,
               child: CircularProgressIndicator(
                 strokeWidth: 2.5,
-                valueColor: AlwaysStoppedAnimation(AppTheme.white),
+                valueColor:
+                AlwaysStoppedAnimation(AppTheme.white),
               ),
             ),
           )
               : Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                widget.icon,
-                color: AppTheme.white,
-                size: ResponsiveHelper.iconLarge,
-              ),
+              Icon(widget.icon,
+                  color: AppTheme.white,
+                  size: ResponsiveHelper.iconLarge),
               const SizedBox(width: 10),
               Text(
                 widget.label,
