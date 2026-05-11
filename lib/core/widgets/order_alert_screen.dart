@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ma7lola/core/widgets/responsive_helper.dart';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:ma7lola_vendor/core/widgets/responsive_helper.dart';
+
+import '../services/http/apis/miscellaneous_api.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎨 App Theme
@@ -257,13 +259,13 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   String get _displayActionRequiredFor =>
       widget.notificationData?.actionRequiredFor ?? '-';
 
-  String get _displayKind =>
-      widget.notificationData?.kind ?? '-';
+  // String get _displayKind =>
+  //     widget.notificationData?.kind ?? '-';
 
   String get _displayOfferedTotal =>
       widget.notificationData?.offeredTotal != null &&
           widget.notificationData!.offeredTotal.isNotEmpty
-          ? '${widget.notificationData!.offeredTotal} SAR'
+          ? '${widget.notificationData!.offeredTotal} EGP '
           : '-';
 
   String get _displayTitle =>
@@ -508,6 +510,7 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
                           const SizedBox(height: 24),
                           _buildCountdownTimer(),
                           const SizedBox(height: 32),
+                          if(_displayType=="tire"||_displayType=="car-parts"||_displayType=="battery")
                           _buildActionButtons(),       // ✅ Accept / Reject
                           const SizedBox(height: 20),
                         ],
@@ -862,14 +865,14 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
           ),
           _buildDivider(),
 
-          // Kind
-          _buildInfoRow(
-            icon: Icons.label_rounded,
-            label: 'التصنيف',
-            value: _displayKind,
-            color: AppTheme.info,
-          ),
-          _buildDivider(),
+          // // Kind
+          // _buildInfoRow(
+          //   icon: Icons.label_rounded,
+          //   label: 'التصنيف',
+          //   value: _displayKind,
+          //   color: AppTheme.info,
+          // ),
+          // _buildDivider(),
 
           // Action Required For
           _buildInfoRow(
@@ -1211,6 +1214,7 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
       ],
     );
   }
+
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

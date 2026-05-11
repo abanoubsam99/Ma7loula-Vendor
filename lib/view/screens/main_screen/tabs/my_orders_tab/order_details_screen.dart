@@ -57,6 +57,25 @@ class _OrderDetailsState extends State<OrderDetails> {
   final TextEditingController _priceController = TextEditingController();
   String? address;
   var prices;
+  late Future<OrderRateModel> _orderFuture;
+  bool _isInit = false;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInit) {
+      _orderFuture = MiscellaneousApi.getCarPartsOrderDetails(
+        locale: context.locale,
+        id: widget.orderNum,
+      );
+
+      _isInit = true;
+    }
+  }
   @override
   void dispose() {
     _priceController.dispose();
@@ -64,20 +83,22 @@ class _OrderDetailsState extends State<OrderDetails> {
   }
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-
-      body: Directionality(
+    final locale = e.EasyLocalization.of(context)!.locale;
+    return Container(
+      color: Colors.white,
+      child: Directionality(
         textDirection: Helpers.isArabic(context) ? TextDirection.rtl : TextDirection.ltr,
         child: FutureBuilder<OrderRateModel>(
-            future: /*(widget.orderType == 0)
-                ? MiscellaneousApi.getBatteryOrderDetails(
-                    locale: context.locale, id: widget.orderNum)
-                : (widget.orderType == 1)
-                    ? MiscellaneousApi.getTiresOrderDetails(
-                        locale: context.locale, id: widget.orderNum)
-                    :*/
-                MiscellaneousApi.getCarPartsOrderDetails(
-                    locale: context.locale, id: widget.orderNum),
+            future: _orderFuture,
+            // future: /*(widget.orderType == 0)
+            //     ? MiscellaneousApi.getBatteryOrderDetails(
+            //         locale: context.locale, id: widget.orderNum)
+            //     : (widget.orderType == 1)
+            //         ? MiscellaneousApi.getTiresOrderDetails(
+            //             locale: context.locale, id: widget.orderNum)
+            //         :*/
+            //     MiscellaneousApi.getCarPartsOrderDetails(
+            //         locale: context.locale, id: widget.orderNum),
             builder: (context, snapshot) {
 
               if (snapshot.connectionState == ConnectionState.waiting) {
@@ -181,7 +202,7 @@ class _OrderDetailsState extends State<OrderDetails> {
                                     return CustomCard(
                                       color: ColorsPalette.white,
                                       border:
-                                          Border.all(color: ColorsPalette.grey),
+                                      Border.all(color: ColorsPalette.grey),
                                       borderRadius: BorderRadius.circular(10),
                                       child: AddressCard(
                                         name: address ?? '',
@@ -236,7 +257,7 @@ class _OrderDetailsState extends State<OrderDetails> {
                                     children: [
                                       Row(
                                         mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
+                                        MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(
                                             LocaleKeys.paymentMethod.tr(),
@@ -249,7 +270,7 @@ class _OrderDetailsState extends State<OrderDetails> {
                                           Spacer(),
                                           Text(
                                             (order?.paymentMethod == 0 ||
-                                                    order?.paymentMethod == 2)
+                                                order?.paymentMethod == 2)
                                                 ? LocaleKeys.cash.tr()
                                                 : LocaleKeys.credit.tr(),
                                             style: TextStyle(
@@ -261,7 +282,7 @@ class _OrderDetailsState extends State<OrderDetails> {
                                           UtilValues.gap4,
                                           SvgPicture.asset(
                                             (order?.paymentMethod == 0 ||
-                                                    order?.paymentMethod == 2)
+                                                order?.paymentMethod == 2)
                                                 ? AssetsManager.cash
                                                 : AssetsManager.masterCard,
                                           ),
@@ -272,10 +293,10 @@ class _OrderDetailsState extends State<OrderDetails> {
                                         Helpers.formatPrice(order?.total).toString(),
                                       ),
                                       if(order?.offered_total!=null)
-                                      _paymentDetails(
-                                        "Offered Total".tr(),
-                                        Helpers.formatPrice(order?.offered_total??0).toString(),
-                                      ),
+                                        _paymentDetails(
+                                          "Offered Total".tr(),
+                                          Helpers.formatPrice(order?.offered_total??0).toString(),
+                                        ),
                                     ],
                                   )),
                             ],
@@ -303,7 +324,7 @@ class _OrderDetailsState extends State<OrderDetails> {
                                   children: [
                                     Row(
                                       mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
+                                      MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
                                           LocaleKeys.rateService.tr(),
@@ -356,51 +377,51 @@ class _OrderDetailsState extends State<OrderDetails> {
                           ),
                         ],
                         if(order?.status=="new")
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Row(children: [
-                            Expanded(
-                              flex: 1, 
-                              child: SimplePrimaryButton(
-                                borderRadius: BorderRadius.circular(5),
-                                label: "Change Price".tr(),
-                                onPressed: () {
-                                  final value = num.tryParse(_priceController.text);
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Row(children: [
+                              Expanded(
+                                flex: 1,
+                                child: SimplePrimaryButton(
+                                  borderRadius: BorderRadius.circular(5),
+                                  label: "Change Price".tr(),
+                                  onPressed: () {
+                                    final value = num.tryParse(_priceController.text);
 
-                                  if (value == null) {
-                                    showSnackbar(
-                                      context: context,
-                                      status: SnackbarStatus.error,
-                                      message: "Invalid price",
-                                    );
-                                    return;
-                                  }
+                                    if (value == null) {
+                                      showSnackbar(
+                                        context: context,
+                                        status: SnackbarStatus.error,
+                                        message: "Invalid price",
+                                      );
+                                      return;
+                                    }
 
-                                  updatePriceOrder(value);
-                                },
-                                // backgroundColor: ColorsPalette.white,
+                                    updatePriceOrder(value);
+                                  },
+                                  // backgroundColor: ColorsPalette.white,
 
-                                // labelColor: ColorsPalette.customGrey,
+                                  // labelColor: ColorsPalette.customGrey,
+                                ),
                               ),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: TextField(
-                                  controller: _priceController,
-                                  keyboardType: TextInputType.number,
-                                  decoration: InputDecoration(
-                                    hintText: "Enter new price".tr(),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                              Expanded(
+                                flex: 2,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: TextField(
+                                    controller: _priceController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      hintText: "Enter new price".tr(),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ]),
-                        ),
+                            ]),
+                          ),
                         Padding(
                           padding: const EdgeInsets.all(8.0),
                           child: Row(children: [
@@ -905,37 +926,35 @@ class _OrderDetailsState extends State<OrderDetails> {
   }
 
   _productsWidget(Order? order) {
-    return SizedBox(
-      height: 200,
-      child: ListView.builder(
-          shrinkWrap: true,
-          itemCount: order?.products?.length,
-          itemBuilder: (context, index) {
-            final product = order?.products?[index];
-            return Padding(
-              padding: EdgeInsets.all(5.0.sp),
-              child: InkWell(
-                onTap: () {},
-                child: ProductCard(
-                  imageUrl: product?.thumbnail?.url ?? '',
-                  title: product?.name ?? '',
-                  onTap: () {},
-                  onPressed: () {},
-                  onPressedMinus: () {},
-                  inCart: false,
-                  showAdd: false,
-                  description: '',
-                  price: product?.total ?? 0.0,
-                  discount: 0.0,
-                  by: LocaleKeys.by.tr(),
-                  vendorName: product?.vendor?.name ?? '',
-                  productName: '',
-                  qtyProduct: product?.qty ?? 1,
-                  products: product!,
-                ),
-              ),
-            );
-          }),
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      itemCount: order?.products?.length ?? 0,
+      itemBuilder: (context, index) {
+        final product = order?.products?[index];
+
+        return Padding(
+          padding: EdgeInsets.all(5.0.sp),
+          child: ProductCard(
+            imageUrl: product?.thumbnail?.url ?? '',
+            title: product?.name ?? '',
+            onTap: () {},
+            onPressed: () {},
+            onPressedMinus: () {},
+            inCart: false,
+            showAdd: false,
+            description: '',
+            price: product?.total ?? 0.0,
+            discount: 0.0,
+            by: LocaleKeys.by.tr(),
+            vendorName: product?.vendor?.name ?? '',
+            productName: '',
+            qtyProduct: product?.qty ?? 1,
+            products: product!,
+          ),
+        );
+      },
     );
   }
+
 }

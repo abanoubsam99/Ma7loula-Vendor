@@ -9,6 +9,7 @@ import '../widgets/order_alert_screen.dart';
 
 
 class NotificationsHelper {
+
   static final NotificationsHelper _instance = NotificationsHelper._internal();
   factory NotificationsHelper() => _instance;
 
@@ -113,8 +114,7 @@ class NotificationsHelper {
     FirebaseMessaging.onMessage.listen(_handleIncomingNotification);
 
     // Handle background messages (when app is closed or in background)
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     // Handle when notification is tapped
     FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationOpenedApp);
   }
@@ -132,17 +132,20 @@ class NotificationsHelper {
     //              (message.notification != null ? _getNotificationType(message.notification!) : '');
 
     if (status!=null && (status == 'new'||status == 'pending_customer'||status == 'offer_pending')) {
-      // final orderId = message.data['order_id']?.toString() ?? (message.notification != null ? _extractOrderId(message.notification!.title) : '');
+      // final orderId = message.data['order_vendor_id']?.toString() ?? (message.notification != null ? _extractOrderId(message.notification!.title) : '');
       // final orderModel = _findOrderModel(orderId);
       //
-      if (message.data!=null && message.data['order_id'] != null) {
+      if (message.data!=null && message.data['order_vendor_id'] != null) {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => OrderDetails(orderNum: int.parse(message.data['order_id'].toString()),orderType: 0,),
+            builder: (context) => OrderDetails(orderNum: int.parse(message.data['order_vendor_id']??0.0),orderType: 0,),
           ),
         );
         _showFullScreenOrderAlert(message.data!);
-      } else if (message.data != null&&message.data["status"]) {
+      } else if (message.data != null &&
+          message.data["status"] != null)
+
+      {
         // Backup
         _showFullScreenOrderAlert(message.data!);
       }
@@ -152,12 +155,12 @@ class NotificationsHelper {
   /// Handle incoming FCM notifications when the app is in the foreground
   void _handleIncomingNotification(RemoteMessage message) {
     if (message.data!=null) {
-      _handleDataMessage(message.notification!);
+      _handleDataMessage(message.data);
     }
   }
 
   /// Handle FCM data messages (background or foreground)
-  void _handleDataMessage(RemoteNotification data) {
+  void _handleDataMessage(Map<String, dynamic> data) {
     // _showFullScreenOrderAlert(data);
 
     // // التحقق من نوع الإشعار
@@ -189,7 +192,7 @@ class NotificationsHelper {
   void _showFullScreenOrderAlert(Map<String, dynamic> data) {
     final context = navigatorKey.currentContext;
     if (context != null) {
-      // استخراج order_id من الإشعار
+      // استخراج order_vendor_id من الإشعار
       // final orderId = _extractOrderId(data.title);
       
       // // محاولة إيجاد OrderModel من القائمة
@@ -204,7 +207,7 @@ class NotificationsHelper {
                 eventType: '${data["event_type"].toString()}',
                 actionRequiredFor: '${data["action_required_for"].toString()}',
                 kind: '${data["kind"].toString()}',
-                orderId: '${data["order_id"].toString()}',
+                orderId: '${data["order_vendor_id"].toString()}',
                 status: '${data["status"].toString()}',
                 orderVendorStatus: '${data["order_vendor_status"].toString()}',
                 orderVendorId: '${data["order_vendor_id"].toString()}',
@@ -212,7 +215,7 @@ class NotificationsHelper {
                 offeredTotal: '${data["offered_total"].toString()}',
                 vendorId: '${data["vendor_id"].toString()}'
             ),
-            orderId: "${data["order_id"].toString()}",
+            orderId: "${data["order_vendor_id"].toString()}",
             orderReference: data["title"] ?? 'N/A',
             customerName: _extractCustomerName(data["body"]),
             location: _extractLocation(data["body"]),
@@ -258,7 +261,7 @@ class NotificationsHelper {
   //   _showHighPriorityNotification(data.title, data.body, 'visit');
   // }
 
-  /// استخراج order_id من العنوان
+  /// استخراج order_vendor_id من العنوان
   String _extractOrderId(String? title) {
     if (title == null) return 'unknown';
     // مثال: "ORD-12345" → "12345"
@@ -435,13 +438,13 @@ class NotificationsHelper {
     }
   }
 
-  /// Background message handler (to handle notifications when the app is in the background)
-  static Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-    final helper = NotificationsHelper();
-    if (message.notification!=null) {
-      helper._handleDataMessage(message.notification!);
-    }
-  }
+  // /// Background message handler (to handle notifications when the app is in the background)
+  // static Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  //   final helper = NotificationsHelper();
+  //   if (message.notification!=null) {
+  //     helper._handleDataMessage(message.notification!);
+  //   }
+  // }
 
   /// Get FCM token (optional, can be used to store or use the token in your app)
   static Future<String?> _getFCMToken() async {
@@ -464,4 +467,22 @@ class NotificationsHelper {
     await messaging.subscribeToTopic(topic);
     print("Subscribed to topic: $topic");
   }
+  void handleBackgroundNotification(RemoteMessage message) {
+    if (message.notification != null) {
+      _handleDataMessage(message.data!);
+    }
+  }
+  @pragma('vm:entry-point')
+  Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    final helper = NotificationsHelper();
+
+    if (message.notification != null) {
+      helper.handleBackgroundNotification(message);
+    }
+  }
+
 }
