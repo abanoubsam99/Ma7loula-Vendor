@@ -160,6 +160,11 @@ class _WinchNationalIDCaptureState extends State<WinchNationalIDCapture> {
       );
     } catch (e) {
       print('خطأ في التقاط الصورة: $e');
+      showSnackbar(
+        context: context,
+        status: SnackbarStatus.error,
+        message: e.toString().replaceAll('ApiException: ', ''),
+      );
     }
   }
 
@@ -193,6 +198,11 @@ class _WinchNationalIDCaptureState extends State<WinchNationalIDCapture> {
       );
     } catch (e) {
       print('خطأ في التقاط الصورة: $e');
+      showSnackbar(
+        context: context,
+        status: SnackbarStatus.error,
+        message: e.toString().replaceAll('ApiException: ', ''),
+      );
     }
   }
 
@@ -226,6 +236,11 @@ class _WinchNationalIDCaptureState extends State<WinchNationalIDCapture> {
       );
     } catch (e) {
       print('خطأ في التقاط الصورة: $e');
+      showSnackbar(
+        context: context,
+        status: SnackbarStatus.error,
+        message: e.toString().replaceAll('ApiException: ', ''),
+      );
     }
   }
 

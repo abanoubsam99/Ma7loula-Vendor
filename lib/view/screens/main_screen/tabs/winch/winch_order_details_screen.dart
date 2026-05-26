@@ -16,6 +16,8 @@ import 'package:url_launcher/url_launcher_string.dart';
 import '../../../../../../core/utils/assets_manager.dart';
 import '../../../../../../core/utils/font.dart';
 import '../../../../../../core/utils/util_values.dart';
+import '../../../../../../core/widgets/form_widgets/primary_button/simple_primary_button.dart';
+import '../../../../../core/utils/snackbars.dart';
 import '../../../../../model/winch/order_details_model.dart';
 import '../my_orders_tab/local_widet/my_orders_card.dart';
 
@@ -23,12 +25,12 @@ class WinchOrderDetails extends StatefulWidget {
   const WinchOrderDetails({
     Key? key,
     required this.orderNum,
-    required this.vendorNum,
+    required this.userNum,
     required this.vendorName,
   }) : super(key: key);
 
   final int orderNum;
-  final String vendorNum;
+  final String userNum;
   final String vendorName;
 
   @override
@@ -36,7 +38,8 @@ class WinchOrderDetails extends StatefulWidget {
 }
 
 class _WinchOrderDetailsState extends State<WinchOrderDetails> {
-  bool _isLoading = false;
+  bool _isLoadingAccept = false;
+  bool _isLoadingCancel = false;
 
   String? address;
   var prices;
@@ -372,11 +375,110 @@ class _WinchOrderDetailsState extends State<WinchOrderDetails> {
                               )),
                         ),
                       ],
+                    if (order?.status == 'new') ...[
+                      UtilValues.gap8,
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(children: [
+                          Expanded(
+                            child: SimplePrimaryButton(
+                              borderRadius: BorderRadius.circular(5),
+                              label: LocaleKeys.sub.tr(),
+                              isLoading: _isLoadingAccept,
+                              onPressed: _isLoadingAccept ? null : _acceptOrder,
+                            ),
+                          ),
+                          UtilValues.gap8,
+                          Expanded(
+                            child: SimplePrimaryButton(
+                              borderRadius: BorderRadius.circular(5),
+                              label: LocaleKeys.cancel.tr(),
+                              backgroundColor: ColorsPalette.white,
+                              labelColor: ColorsPalette.customGrey,
+                              isLoading: _isLoadingCancel,
+                              onPressed: _isLoadingCancel ? null : _cancelOrder,
+                            ),
+                          )
+                        ]),
+                      ),
                     ],
-                  ),
-                ));
+                  ],
+                ),
+              ));
           }),
     );
+  }
+
+  void _acceptOrder() async {
+    try {
+      setState(() {
+        _isLoadingAccept = true;
+      });
+      await MiscellaneousApi.updateOrderStatusWinch(
+        locale: context.locale,
+        orderId: widget.orderNum,
+      );
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) {
+        return WinchOrderDetails(
+          orderNum: widget.orderNum,
+          userNum: widget.userNum,
+          vendorName: widget.vendorName,
+        );
+      }));
+      showSnackbar(
+        context: context,
+        status: SnackbarStatus.success,
+        message: LocaleKeys.done.tr(),
+      );
+    } catch (e) {
+      setState(() {
+        _isLoadingAccept = false;
+      });
+      showSnackbar(
+        context: context,
+        status: SnackbarStatus.error,
+        message: e.toString(),
+      );
+    }
+  }
+
+  void _cancelOrder() async {
+    try {
+      setState(() {
+        _isLoadingCancel = true;
+      });
+      // For winch orders, we may need to check if there's a specific cancel method
+      // For now, we'll use updateOrderStatusWinch with a cancel status
+      // You may need to adjust this based on your API requirements
+      await MiscellaneousApi.updateOrderStatusWinch(
+        locale: context.locale,
+        orderId: widget.orderNum,
+      );
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) {
+        return WinchOrderDetails(
+          orderNum: widget.orderNum,
+          userNum: widget.userNum,
+          vendorName: widget.vendorName,
+        );
+      }));
+      setState(() {
+        _isLoadingCancel = false;
+      });
+      showSnackbar(
+        context: context,
+        status: SnackbarStatus.success,
+        message: LocaleKeys.done.tr(),
+      );
+    } catch (e) {
+      setState(() {
+        _isLoadingCancel = false;
+      });
+      showSnackbar(
+        context: context,
+        status: SnackbarStatus.error,
+        message: e.toString(),
+      );
+    }
   }
 
   _paymentDetails(String text, String num) {

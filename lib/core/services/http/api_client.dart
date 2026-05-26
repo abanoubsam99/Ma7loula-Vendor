@@ -33,6 +33,7 @@ class ApiClient {
 }
 
 
+
 class CurlInterceptor extends Interceptor {
   @override
   void onRequest(
@@ -42,11 +43,60 @@ class CurlInterceptor extends Interceptor {
     final curl = _createCurl(options);
 
     debugPrint('╔═══════════════════════════════════════════');
-    debugPrint('📌 CURL');
+    debugPrint('📌 CURL REQUEST');
     debugPrint(curl);
     debugPrint('╚═══════════════════════════════════════════');
 
     super.onRequest(options, handler);
+  }
+
+  @override
+  void onResponse(
+      Response response,
+      ResponseInterceptorHandler handler,
+      ) {
+    debugPrint('╔═══════════════════════════════════════════');
+    debugPrint('✅ API RESPONSE');
+    debugPrint('URL: ${response.requestOptions.uri}');
+    debugPrint('STATUS CODE: ${response.statusCode}');
+
+    try {
+      const encoder = JsonEncoder.withIndent('  ');
+      final prettyJson = encoder.convert(response.data);
+      debugPrint(prettyJson);
+    } catch (e) {
+      debugPrint(response.data.toString());
+    }
+
+    debugPrint('╚═══════════════════════════════════════════');
+
+    super.onResponse(response, handler);
+  }
+
+  @override
+  void onError(
+      DioException err,
+      ErrorInterceptorHandler handler,
+      ) {
+    debugPrint('╔═══════════════════════════════════════════');
+    debugPrint('❌ API ERROR');
+    debugPrint('URL: ${err.requestOptions.uri}');
+    debugPrint('STATUS CODE: ${err.response?.statusCode}');
+    debugPrint('MESSAGE: ${err.message}');
+
+    if (err.response?.data != null) {
+      try {
+        const encoder = JsonEncoder.withIndent('  ');
+        final prettyJson = encoder.convert(err.response?.data);
+        debugPrint(prettyJson);
+      } catch (e) {
+        debugPrint(err.response?.data.toString());
+      }
+    }
+
+    debugPrint('╚═══════════════════════════════════════════');
+
+    super.onError(err, handler);
   }
 
   String _createCurl(RequestOptions options) {
@@ -64,11 +114,20 @@ class CurlInterceptor extends Interceptor {
 
     // DATA
     if (options.data != null) {
-      final data = options.data is String
-          ? options.data
-          : jsonEncode(options.data);
+      String dataStr = "";
+      if (options.data is String) {
+        dataStr = options.data;
+      } else if (options.data is FormData) {
+        dataStr = "FormData(...)";
+      } else {
+        try {
+          dataStr = jsonEncode(options.data);
+        } catch (e) {
+          dataStr = options.data.toString();
+        }
+      }
 
-      buffer.write(" -d '$data'");
+      buffer.write(" -d '$dataStr'");
     }
 
     // URL

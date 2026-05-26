@@ -54,6 +54,9 @@ class OrderDetails extends StatefulWidget {
 
 class _OrderDetailsState extends State<OrderDetails> {
   bool _isLoading = false;
+  bool _isLoadingChangePrice = false;
+  bool _isLoadingAccept = false;
+  bool _isLoadingCancel = false;
   final TextEditingController _priceController = TextEditingController();
   String? address;
   var prices;
@@ -385,7 +388,8 @@ class _OrderDetailsState extends State<OrderDetails> {
                                 child: SimplePrimaryButton(
                                   borderRadius: BorderRadius.circular(5),
                                   label: "Change Price".tr(),
-                                  onPressed: () {
+                                  isLoading: _isLoadingChangePrice,
+                                  onPressed: _isLoadingChangePrice ? null : () {
                                     final value = num.tryParse(_priceController.text);
 
                                     if (value == null) {
@@ -429,7 +433,8 @@ class _OrderDetailsState extends State<OrderDetails> {
                               child: SimplePrimaryButton(
                                 borderRadius: BorderRadius.circular(5),
                                 label: LocaleKeys.sub.tr(),
-                                onPressed:updateOrder,
+                                isLoading: _isLoadingAccept,
+                                onPressed: _isLoadingAccept ? null : updateOrder,
                               ),
                             ),
                             UtilValues.gap8,
@@ -439,7 +444,8 @@ class _OrderDetailsState extends State<OrderDetails> {
                                 label: LocaleKeys.cancel.tr(),
                                 backgroundColor: ColorsPalette.white,
                                 labelColor: ColorsPalette.customGrey,
-                                onPressed: cancelOrder,
+                                isLoading: _isLoadingCancel,
+                                onPressed: _isLoadingCancel ? null : cancelOrder,
                               ),
                             )
                           ]),
@@ -453,6 +459,9 @@ class _OrderDetailsState extends State<OrderDetails> {
   }
   void updateOrder() async {
     try {
+      setState(() {
+        _isLoadingAccept = true;
+      });
       await MiscellaneousApi.updateCarPartsOrderStatus(locale: context.locale, orderId: widget.orderNum);
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) {
         return OrderDetails(
@@ -467,6 +476,9 @@ class _OrderDetailsState extends State<OrderDetails> {
       );
       // Navigator.pop(context);
     } catch (e) {
+      setState(() {
+        _isLoadingAccept = false;
+      });
       showSnackbar(
         context: context,
         status: SnackbarStatus.error,
@@ -476,6 +488,9 @@ class _OrderDetailsState extends State<OrderDetails> {
   }
   Future<void> updatePriceOrder(num offered_total) async {
     try {
+      setState(() {
+        _isLoadingChangePrice = true;
+      });
 
       await MiscellaneousApi.carPartsSubmitPriceOffer(
         locale: context.locale,
@@ -502,6 +517,9 @@ class _OrderDetailsState extends State<OrderDetails> {
       );
 
     }  catch (e) {
+      setState(() {
+        _isLoadingChangePrice = false;
+      });
       showSnackbar(
         context: context,
         status: SnackbarStatus.error,
@@ -513,6 +531,9 @@ class _OrderDetailsState extends State<OrderDetails> {
 
   void cancelOrder() async {
     try {
+      setState(() {
+        _isLoadingCancel = true;
+      });
       if (widget.orderType == 0) {
         await MiscellaneousApi.cancelBatteryOrder(
             id: widget.orderNum, locale: context.locale);
@@ -529,7 +550,9 @@ class _OrderDetailsState extends State<OrderDetails> {
         await MiscellaneousApi.getCarPartsOrderDetails(
             locale: context.locale, id: widget.orderNum);
       }
-      setState(() {});
+      setState(() {
+        _isLoadingCancel = false;
+      });
       showSnackbar(
         context: context,
         status: SnackbarStatus.success,
@@ -537,6 +560,9 @@ class _OrderDetailsState extends State<OrderDetails> {
       );
       // Navigator.pop(context);
     } catch (e) {
+      setState(() {
+        _isLoadingCancel = false;
+      });
       showSnackbar(
         context: context,
         status: SnackbarStatus.error,

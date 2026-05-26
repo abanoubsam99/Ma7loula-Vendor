@@ -136,6 +136,11 @@ class _EmergencyNationalIDCaptureState
       );
     } catch (e) {
       print('خطأ في التقاط الصورة: $e');
+      showSnackbar(
+        context: context,
+        status: SnackbarStatus.error,
+        message: e.toString().replaceAll('ApiException: ', ''),
+      );
     }
   }
 
@@ -169,6 +174,11 @@ class _EmergencyNationalIDCaptureState
       );
     } catch (e) {
       print('خطأ في التقاط الصورة: $e');
+      showSnackbar(
+        context: context,
+        status: SnackbarStatus.error,
+        message: e.toString().replaceAll('ApiException: ', ''),
+      );
     }
   }
 
@@ -202,6 +212,11 @@ class _EmergencyNationalIDCaptureState
       );
     } catch (e) {
       print('خطأ في التقاط الصورة: $e');
+      showSnackbar(
+        context: context,
+        status: SnackbarStatus.error,
+        message: e.toString().replaceAll('ApiException: ', ''),
+      );
     }
   }
 
@@ -235,6 +250,11 @@ class _EmergencyNationalIDCaptureState
       );
     } catch (e) {
       print('خطأ في التقاط الصورة: $e');
+      showSnackbar(
+        context: context,
+        status: SnackbarStatus.error,
+        message: e.toString().replaceAll('ApiException: ', ''),
+      );
     }
   }
 
@@ -332,8 +352,22 @@ class _EmergencyNationalIDCaptureState
                   driverLicenceNoFormField(),
                   UtilValues.gap16,
                   taxNoFormField(),
-                UtilValues.gap16,
-                vendorIdFormField(),
+                  UtilValues.gap16,
+                  vendorIdFormField(),
+                  UtilValues.gap16,
+                  if (_driverCImageLic != null)
+                    scannerWithImgField(
+                        LocaleKeys.fishFile.tr(),
+                        LocaleKeys.fishFileDesc.tr(),
+                        _driverCCaptureImageLic,
+                        _driverCImageLic!)
+                  else
+                    scannerField(
+                        LocaleKeys.fishFile.tr(),
+                        LocaleKeys.fishFileDesc.tr(),
+                        _driverCCaptureImageLic,
+                        AssetsManager.scanner),
+                  UtilValues.gap16,
                 ],
               ),
             ),
@@ -747,6 +781,9 @@ class _EmergencyNationalIDCaptureState
 
       if (formState!.validate() &&
               _image != null &&
+              _driverCImageLic != null &&
+              idImg.isNotEmpty &&
+              driverCImgLic.isNotEmpty &&
               _licenceNo.text.isNotEmpty /*&&*/
           // _licenceExDate != null &&
           // lat long
@@ -762,10 +799,10 @@ class _EmergencyNationalIDCaptureState
               otp: int.tryParse(widget.otp) ?? 0,
               locale: context.locale,
               idImg: idImg,
-              criminalRecordImage: idImg,
+              criminalRecordImage: driverCImgLic,
               vendorId: int.tryParse(_vendorIdController.text) ?? 62, // Use user input vendor ID or default to 62
             );
-        setState(() => _isLoadingBTN = true);
+        setState(() => _isLoadingBTN = false);
 
         Navigator.pushReplacement(
           context,

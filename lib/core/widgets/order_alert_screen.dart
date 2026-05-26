@@ -6,6 +6,11 @@ import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:ma7lola_vendor/core/widgets/responsive_helper.dart';
 
+import 'package:easy_localization/easy_localization.dart' as e;
+import 'package:ma7lola_vendor/core/generated/locale_keys.g.dart';
+import 'package:ma7lola_vendor/core/utils/colors_palette.dart';
+import 'package:ma7lola_vendor/core/widgets/form_widgets/primary_button/simple_primary_button.dart';
+
 import '../services/http/apis/miscellaneous_api.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -240,6 +245,9 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   late Timer _countdownTimer;
   late AudioPlayer _audioPlayer;
 
+  final TextEditingController _priceController = TextEditingController();
+  bool _isLoadingChangePrice = false;
+
   int _remainingSeconds = 30;
   bool _isAccepting = false;
   bool _isRejecting = false;
@@ -255,6 +263,8 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
 
   String get _displayEventType =>
       widget.notificationData?.eventType ?? '-';
+
+  String get _displayStatus => widget.notificationData?.status ?? '-';
 
   String get _displayActionRequiredFor =>
       widget.notificationData?.actionRequiredFor ?? '-';
@@ -354,8 +364,35 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   void _handleTimeout() {
     _stopAlarmSound();
     _countdownTimer.cancel();
-    if (mounted) Navigator.of(context).pop();
     debugPrint('⏰ انتهى الوقت للطلب: $_displayOrderId');
+  }
+
+  Future<void> updatePriceOrder(num offered_total) async {
+    try {
+      setState(() {
+        _isLoadingChangePrice = true;
+      });
+
+      await MiscellaneousApi.carPartsSubmitPriceOffer(
+        locale: e.EasyLocalization.of(context)!.locale,
+        orderId: int.parse(_displayOrderId),
+        offered_total: offered_total,
+      );
+
+      if (mounted) {
+        _showSuccessSnackBar(LocaleKeys.done.tr());
+        setState(() {
+          _isLoadingChangePrice = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _isLoadingChangePrice = false;
+        });
+        _showErrorSnackBar(error.toString());
+      }
+    }
   }
 
   Future<void> _handleAccept() async {
@@ -363,20 +400,27 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
     setState(() => _isAccepting = true);
     HapticFeedback.mediumImpact();
     try {
-      if (widget.onAccept != null) {
-        await widget.onAccept!();
+      if (_displayType == "tire" || _displayType == "car-parts" || _displayType == "battery") {
+         await MiscellaneousApi.updateCarPartsOrderStatus(locale: e.EasyLocalization.of(context)!.locale, orderId: int.parse(_displayOrderId));
+      } else if (_displayType == "winch") {
+         await MiscellaneousApi.updateOrderStatusWinch(locale: e.EasyLocalization.of(context)!.locale, orderId: int.parse(_displayOrderId));
+      } else if (_displayType == "emergency") {
+         await MiscellaneousApi.updateOrderStatusEmergency(locale: e.EasyLocalization.of(context)!.locale, orderId: int.parse(_displayOrderId));
+      } else {
+         if (widget.onAccept != null) {
+           await widget.onAccept!();
+         }
       }
       _stopAlarmSound();
       _countdownTimer.cancel();
       if (mounted) {
-        _showSuccessSnackBar('✅ تم قبول الطلب بنجاح');
-        await Future.delayed(const Duration(milliseconds: 600));
-        Navigator.of(context).pop(true);
+        _showSuccessSnackBar(LocaleKeys.done.tr());
+        setState(() => _isAccepting = false);
       }
-    } catch (e) {
+    } catch (error) {
       if (mounted) {
         setState(() => _isAccepting = false);
-        _showErrorSnackBar('حدث خطأ أثناء قبول الطلب');
+        _showErrorSnackBar(error.toString());
       }
     }
   }
@@ -386,20 +430,36 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
     setState(() => _isRejecting = true);
     HapticFeedback.mediumImpact();
     try {
-      if (widget.onReject != null) {
-        await widget.onReject!();
+      if (_displayType == "tire" || _displayType == "car-parts" || _displayType == "battery") {
+        final locale = e.EasyLocalization.of(context)!.locale;
+        if (_displayType == "battery") {
+          await MiscellaneousApi.cancelBatteryOrder(id: int.parse(_displayOrderId), locale: locale);
+        } else if (_displayType == "tire") {
+          await MiscellaneousApi.cancelTiresOrder(id: int.parse(_displayOrderId), locale: locale);
+        } else {
+          await MiscellaneousApi.cancelCarPartsOrder(id: int.parse(_displayOrderId), locale: locale);
+        }
+      } else if (_displayType == "winch") {
+        final locale = e.EasyLocalization.of(context)!.locale;
+        await MiscellaneousApi.updateOrderStatusWinch(locale: locale, orderId: int.parse(_displayOrderId));
+      } else if (_displayType == "emergency") {
+        final locale = e.EasyLocalization.of(context)!.locale;
+        await MiscellaneousApi.updateOrderStatusEmergency(locale: locale, orderId: int.parse(_displayOrderId));
+      } else {
+        if (widget.onReject != null) {
+          await widget.onReject!();
+        }
       }
       _stopAlarmSound();
       _countdownTimer.cancel();
       if (mounted) {
-        _showErrorSnackBar('❌ تم رفض الطلب');
-        await Future.delayed(const Duration(milliseconds: 600));
-        Navigator.of(context).pop(false);
+        _showSuccessSnackBar(LocaleKeys.done.tr());
+        setState(() => _isRejecting = false);
       }
-    } catch (e) {
+    } catch (error) {
       if (mounted) {
         setState(() => _isRejecting = false);
-        _showErrorSnackBar('حدث خطأ أثناء رفض الطلب');
+        _showErrorSnackBar(error.toString());
       }
     }
   }
@@ -461,6 +521,7 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
 
   @override
   void dispose() {
+    _priceController.dispose();
     _pulseController.dispose();
     _floatController.dispose();
     _ringController.dispose();
@@ -510,8 +571,10 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
                           const SizedBox(height: 24),
                           _buildCountdownTimer(),
                           const SizedBox(height: 32),
-                          if(_displayType=="tire"||_displayType=="car-parts"||_displayType=="battery")
-                          _buildActionButtons(),       // ✅ Accept / Reject
+                          if((_displayType=="tire"||_displayType=="car-parts"||_displayType=="battery") && _displayStatus == "new")
+                            _buildChangePriceSection(),
+                          if(_displayType=="tire"||_displayType=="car-parts"||_displayType=="battery"||_displayType=="winch"||_displayType=="emergency")
+                            _buildActionButtons(),       // ✅ Accept / Reject
                           const SizedBox(height: 20),
                         ],
                       ),
@@ -1161,37 +1224,81 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
     );
   }
 
+  Widget _buildChangePriceSection() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24.0),
+      child: Row(children: [
+        Expanded(
+          flex: 1,
+          child: SimplePrimaryButton(
+            borderRadius: BorderRadius.circular(5),
+            label: "Change Price".tr(),
+            isLoading: _isLoadingChangePrice,
+            onPressed: _isLoadingChangePrice ? null : () {
+              final value = num.tryParse(_priceController.text);
+              if (value == null) {
+                _showErrorSnackBar("Invalid price");
+                return;
+              }
+              updatePriceOrder(value);
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 2,
+          child: TextField(
+            controller: _priceController,
+            keyboardType: TextInputType.number,
+            style: TextStyle(color: AppTheme.getText(_isDark)),
+            decoration: InputDecoration(
+              hintText: "Enter new price".tr(),
+              hintStyle: TextStyle(color: AppTheme.getTextSecondary(_isDark)),
+              filled: true,
+              fillColor: AppTheme.getCard(_isDark),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppTheme.getBorder(_isDark)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppTheme.getBorder(_isDark)),
+              ),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // ✅ Accept / ❌ Reject buttons
   // ═══════════════════════════════════════════════════════════════════════
   Widget _buildActionButtons() {
     return Column(
       children: [
-        // Accept
-        SizedBox(
-          width: double.infinity,
-          child: _ActionButton(
-            onPressed: _isAccepting || _isRejecting ? null : _handleAccept,
-            label: 'قبول العرض',
-            icon: Icons.check_circle_rounded,
-            gradient: AppTheme.secondaryGradient,
-            isLoading: _isAccepting,
-            isDark: _isDark,
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        // Reject
-        SizedBox(
-          width: double.infinity,
-          child: _ActionButton(
-            onPressed: _isAccepting || _isRejecting ? null : _handleReject,
-            label: 'رفض العرض',
-            icon: Icons.cancel_rounded,
-            gradient: AppTheme.errorGradient,
-            isLoading: _isRejecting,
-            isDark: _isDark,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: SimplePrimaryButton(
+                borderRadius: BorderRadius.circular(5),
+                label: LocaleKeys.sub.tr(),
+                isLoading: _isAccepting,
+                onPressed: _isAccepting || _isRejecting ? null : _handleAccept,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SimplePrimaryButton(
+                borderRadius: BorderRadius.circular(5),
+                label: LocaleKeys.cancel.tr(),
+                backgroundColor: ColorsPalette.white,
+                labelColor: ColorsPalette.customGrey,
+                isLoading: _isRejecting,
+                onPressed: _isAccepting || _isRejecting ? null : _handleReject,
+              ),
+            )
+          ]
         ),
         const SizedBox(height: 14),
 

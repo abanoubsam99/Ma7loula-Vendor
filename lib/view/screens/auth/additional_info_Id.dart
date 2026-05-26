@@ -705,6 +705,7 @@ class _NationalIDCaptureState extends State<NationalIDCapture> {
           image: _image!, locale: context.locale);
       setState(() {
         idImg = d.data?.images?.first.filename ?? '';
+        print("idImgidImgidImgidImgidImgidImg ${idImg}");
       });
       setState(() => _loading = true);
 

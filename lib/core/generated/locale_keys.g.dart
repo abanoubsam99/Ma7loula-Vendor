@@ -53,6 +53,7 @@ abstract class LocaleKeys {
   static const drawerSettings = 'drawerSettings';
   static const drawerSupport = 'drawerSupport';
   static const drawerLogout = 'drawerLogout';
+  // static const deleteAccount = 'deleteAccount';
   static const drawerLang = 'drawerLang';
   static const orderNumber = 'orderNumber';
   static const awaitingOrder = 'awaitingOrder';

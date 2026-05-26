@@ -9,6 +9,7 @@ import 'package:ma7lola_vendor/view/screens/main_screen/tabs/profile_tab/edit_pr
 import 'package:provider/provider.dart';
 import 'package:sizer/sizer.dart';
 
+import '../../../../../controller/SessionManager.dart';
 import '../../../../../core/dialogs/confirmation_dialog.dart';
 import '../../../../../core/dialogs/delete_account_dialog.dart';
 import '../../../../../core/generated/locale_keys.g.dart';
@@ -177,6 +178,14 @@ class ProfileTab extends StatelessWidget {
                           icon: AssetsManager.logout,
                           label: LocaleKeys.drawerLogout.tr(),
                           onTap: () => _logout(context),
+                        ),
+                      ],
+                      if (userProvider.isLoggedIn) ...[
+                        UtilValues.gap8,
+                        ProfileTabItem(
+                          icon: AssetsManager.delete,
+                          label: LocaleKeys.deleteAccount.tr(),
+                          onTap: () => _deleteAccount(context),
                         ),
                       ],
                     ],
@@ -361,8 +370,11 @@ class ProfileTab extends StatelessWidget {
       // setState(() => _isLoading = true);
       final userProvider = context.read<UserProvider>();
       // final fcmToken = await FirebaseMessaging.instance.getToken();
+      SessionManager.logout();
 
-      await userProvider.logout(/*userProvider.user!.email, fcmToken*/);
+      await userProvider.logout();
+
+      // await userProvider.logout(/*userProvider.user!.email, fcmToken*/);
 
       Navigator.of(context).popUntil((route) => route.isFirst);
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) {

@@ -129,13 +129,25 @@ class UserProvider with ChangeNotifier {
           locale: locale,
           idImg: idImg,
           address: address);
+      // final token = user?.data?.user?.authToken;
+      // await Future.wait([
+      //   SecureStorageService.instance.writeString(
+      //     key: SecureStorageKeys.token,
+      //     value: token ?? '',
+      //   ),
+      // ]);
+
+
       final token = user?.data?.user?.authToken;
-      await Future.wait([
-        SecureStorageService.instance.writeString(
-          key: SecureStorageKeys.token,
-          value: token ?? '',
-        ),
-      ]);
+
+      if (token == null || token.isEmpty) {
+        throw Exception("Login failed after registration");
+      }
+
+      await SecureStorageService.instance.writeString(
+        key: SecureStorageKeys.token,
+        value: token,
+      );
       notifyListeners();
     } catch (error) {
       log(error.toString());
@@ -186,10 +198,15 @@ class UserProvider with ChangeNotifier {
       );
       print('dkkdkd #$user');
       final token = user?.data?.user?.authToken;
+      
+      if (token == null || token.isEmpty) {
+        throw Exception(user?.message ?? "Login failed after registration");
+      }
+
       await Future.wait([
         SecureStorageService.instance.writeString(
           key: SecureStorageKeys.token,
-          value: token ?? '',
+          value: token,
         ),
       ]);
       notifyListeners();
@@ -225,10 +242,15 @@ class UserProvider with ChangeNotifier {
       );
       print('dkkdkd #$user');
       final token = user?.data?.user?.authToken;
+      
+      if (token == null || token.isEmpty) {
+        throw Exception(user?.message ?? "Login failed after registration");
+      }
+
       await Future.wait([
         SecureStorageService.instance.writeString(
           key: SecureStorageKeys.token,
-          value: token ?? '',
+          value: token,
         ),
       ]);
       notifyListeners();

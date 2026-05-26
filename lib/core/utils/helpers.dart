@@ -31,8 +31,8 @@ class Helpers {
 */
   static void debugDioError(DioError error) {
     if (kDebugMode) {
-      log(error.response!.statusCode.toString());
-      log(error.response!.data.toString());
+      // log(error.response!.statusCode.toString());
+      // log(error.response!.data.toString());
     }
   }
 

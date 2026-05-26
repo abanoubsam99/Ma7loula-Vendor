@@ -322,7 +322,7 @@ class _WinchMyOrdersTabState extends State<WinchMyOrdersTab>
                         return WinchOrderDetails(
                           orderNum: order.id ?? 0,
                           vendorName: order.worker?.name ?? '',
-                          vendorNum: order.worker?.phone ?? '',
+                          userNum: order.worker?.phone ?? '',
                         );
                       }));
                     },
@@ -340,7 +340,7 @@ class _WinchMyOrdersTabState extends State<WinchMyOrdersTab>
                           return WinchOrderDetails(
                             orderNum: order.id ?? 0,
                             vendorName: order.worker?.name ?? '',
-                            vendorNum: order.worker?.phone ?? '',
+                            userNum: order.worker?.phone ?? '',
                           );
                         }));
                       },

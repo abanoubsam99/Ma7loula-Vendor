@@ -62,8 +62,9 @@ Aa@123456
 * phone: 01234567895
 * pass : Aa@123456
 * mahlola emerg  طوارئ   Emergency
-* phone: 01234567894
-* pass : Aa@123456*
+* Vendor Emergency. New 19jun
+01014981809
+Q!1234567
 * */
 
 void main() async {

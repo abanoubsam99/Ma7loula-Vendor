@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:ma7lola_vendor/model/otp_model.dart';
 import 'package:ma7lola_vendor/model/user.dart';
 
+import '../../../../controller/SessionManager.dart';
 import '../../../generated/locale_keys.g.dart';
 import '../../../utils/helpers.dart';
 import '../../secure_storage/secure_storage_keys.dart.dart';
@@ -19,49 +20,83 @@ import '../interceptors/api_interceptor.dart';
 import 'exceptions/api_exception.dart';
 
 class UserApi {
-  static Future<UserModel> login(
-      {required String? phone,
-      required String? password,
-      required Locale locale}) async {
+  static Future<UserModel> login({
+    required String? phone,
+    required String? password,
+    required Locale locale,
+  }) async {
+
     final storedVendorId = await SecureStorageService.instance
         .readString(key: SecureStorageKeys.vendorID);
+
     final fcmToken = await FirebaseMessaging.instance.getToken();
-    print("fcmToken=$fcmToken");
+
     final id = int.tryParse(storedVendorId ?? '');
-    log("vendorID in login = $id");
+
     final String api = (id == 1)
         ? loginEndPoint
         : (id == 2)
-            ? loginCarPartsEndPoint
-            : (id == 3)
-                ? loginWinchEndPoint
-                : loginEmergencyEndPoint;
+        ? loginCarPartsEndPoint
+        : (id == 3)
+        ? loginWinchEndPoint
+        : loginEmergencyEndPoint;
 
     try {
-      final response = await ApiClient.instance.dio.post(api,
-          data: {
-            "phone": phone,
-            "password": password,
-            "fcm_token": fcmToken,
-            "platform":Platform.isAndroid?"Android":"IOS",
-            // "device_id": "2",
-          },
-          options: Options(headers: {
-            'lang': locale.languageCode,
-          }));
+
+      final response = await ApiClient.instance.dio.post(
+        api,
+        data: {
+          "phone": phone,
+          "password": password,
+          "fcm_token": fcmToken,
+          "platform": Platform.isAndroid ? "Android" : "IOS",
+        },
+        options: Options(headers: {
+          'lang': locale.languageCode,
+        }),
+      );
 
       log("Login ${response.data}");
-      return UserModel.fromJson(response.data);
+
+      final userModel = UserModel.fromJson(response.data);
+
+      /// لو مفيش user يبقى اللوجين فشل
+      if (userModel.data?.user == null) {
+        throw ApiException(
+          userModel.message ??
+              LocaleKeys.genericErrorMessage.tr(),
+        );
+      }
+
+      /// أو لو التوكن فاضي
+      if ((userModel.data?.user?.authToken ?? '').isEmpty) {
+        throw ApiException(
+          userModel.message ??
+              LocaleKeys.genericErrorMessage.tr(),
+        );
+      }
+      SessionManager.resetSession();
+
+      return userModel;
+
     } on DioError catch (error) {
+
       Helpers.debugDioError(error);
-      if (error.response!.statusCode == 422 ||
-          error.response!.statusCode == 400) {
-        final errorMsg = error.response!.data['message'] as String;
+
+      if (error.response?.statusCode == 422 ||
+          error.response?.statusCode == 400) {
+
+        final errorMsg =
+            error.response?.data['message'] as String? ??
+                LocaleKeys.genericErrorMessage.tr();
+
         throw ApiException(errorMsg);
+
       } else {
         rethrow;
       }
-    } on ApiException catch (_) {
+
+    } on ApiException {
       rethrow;
     } catch (error) {
       throw LocaleKeys.genericErrorMessage.tr();
@@ -122,8 +157,21 @@ class UserApi {
           options: Options(headers: {
             'lang': locale.languageCode,
           }));
+      final data = response.data;
 
-      return UserModel.fromJson(response.data);
+      if (data is Map && data['success'] == false) {
+        throw ApiException(data['message'] ?? 'Registration failed');
+      }
+
+      final model = UserModel.fromJson(data);
+
+      final token = model.data?.user?.authToken;
+
+      if (token == null || token.isEmpty) {
+        throw ApiException("Invalid token received");
+      }
+
+      return model;
     } on DioError catch (error) {
       Helpers.debugDioError(error);
 
@@ -188,7 +236,19 @@ class UserApi {
             'lang': locale.languageCode,
           }));
 
-      return UserModel.fromJson(response.data);
+      final data = response.data;
+      if (data is Map && data['success'] == false) {
+        throw ApiException(data['message'] ?? 'Registration failed');
+      }
+
+      final model = UserModel.fromJson(data);
+      final token = model.data?.user?.authToken;
+
+      if (token == null || token.isEmpty) {
+        throw ApiException(model.message ?? "Invalid token received");
+      }
+
+      return model;
     } on DioError catch (error) {
       Helpers.debugDioError(error);
 
@@ -236,7 +296,19 @@ class UserApi {
                 'lang': locale.languageCode,
               }));
 
-      return UserModel.fromJson(response.data);
+      final data = response.data;
+      if (data is Map && data['success'] == false) {
+        throw ApiException(data['message'] ?? 'Registration failed');
+      }
+
+      final model = UserModel.fromJson(data);
+      final token = model.data?.user?.authToken;
+
+      if (token == null || token.isEmpty) {
+        throw ApiException(model.message ?? "Invalid token received");
+      }
+
+      return model;
     } on DioError catch (error) {
       Helpers.debugDioError(error);
 

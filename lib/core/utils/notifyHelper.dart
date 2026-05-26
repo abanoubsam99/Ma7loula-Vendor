@@ -2,12 +2,25 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
+import 'package:ma7lola_vendor/view/screens/main_screen/tabs/winch/winch_order_details_screen.dart';
 
 import '../../firebase_options.dart';
 import '../../view/screens/main_screen/tabs/my_orders_tab/order_details_screen.dart';
 import '../widgets/order_alert_screen.dart';
 
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
+  final helper = NotificationsHelper();
+
+  if (message.notification != null) {
+    helper.handleBackgroundNotification(message);
+    NotificationsHelper.showFullScreenOrderAlert(message.data);
+  }
+}
 class NotificationsHelper {
 
   static final NotificationsHelper _instance = NotificationsHelper._internal();
@@ -136,18 +149,23 @@ class NotificationsHelper {
       // final orderModel = _findOrderModel(orderId);
       //
       if (message.data!=null && message.data['order_vendor_id'] != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => OrderDetails(orderNum: int.parse(message.data['order_vendor_id']??0.0),orderType: 0,),
-          ),
-        );
-        _showFullScreenOrderAlert(message.data!);
-      } else if (message.data != null &&
-          message.data["status"] != null)
-
-      {
+        if((message.data['type']=="car-parts"||message.data['type']=="tire"||message.data['type']=="battery")){
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => OrderDetails(orderNum: int.parse(message.data['order_vendor_id']??0.0),orderType: 0,),
+            ),
+          );
+        }else if (message.data['type']=="winch"){
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => WinchOrderDetails(orderNum: int.parse(message.data['order_vendor_id']??0.0),userNum: int.parse(message.data['id']??0.0).toString(),vendorName: "#${int.parse(message.data['id']??0.0).toString()}",),
+            ),
+          );
+        }
+        showFullScreenOrderAlert(message.data!);
+      } else if (message.data != null && message.data["status"] != null) {
         // Backup
-        _showFullScreenOrderAlert(message.data!);
+        showFullScreenOrderAlert(message.data!);
       }
     }
   }
@@ -189,7 +207,7 @@ class NotificationsHelper {
   // }
 
   /// عرض Full Screen Alert للطلب الجديد
-  void _showFullScreenOrderAlert(Map<String, dynamic> data) {
+ static void showFullScreenOrderAlert(Map<String, dynamic> data) {
     final context = navigatorKey.currentContext;
     if (context != null) {
       // استخراج order_vendor_id من الإشعار
@@ -217,8 +235,8 @@ class NotificationsHelper {
             ),
             orderId: "${data["order_vendor_id"].toString()}",
             orderReference: data["title"] ?? 'N/A',
-            customerName: _extractCustomerName(data["body"]),
-            location: _extractLocation(data["body"]),
+            customerName: extractCustomerName(data["body"]),
+            location: extractLocation(data["body"]),
             orderDetails: data["body"],
             // orderModel: orderModel, // تمرير OrderModel إذا وُجد
           ),
@@ -228,7 +246,7 @@ class NotificationsHelper {
     }
     
     // عرض notification عادي كـ backup
-    _showHighPriorityNotification("${data["title"]}", "${data["body"]}", 'order');
+    // _showHighPriorityNotification("${data["title"]}", "${data["body"]}", 'order');
   }
 
   /// عرض Full Screen Alert للزيارة
@@ -316,7 +334,7 @@ class NotificationsHelper {
   // }
 
   /// استخراج اسم العميل من body الإشعار
-  String _extractCustomerName(String? body) {
+  static String extractCustomerName(String? body) {
     if (body == null) return 'عميل جديد';
     // TODO: تحسين الاستخراج بناءً على صيغة الإشعار من Backend
     return body.split(':').first.trim();
@@ -331,7 +349,7 @@ class NotificationsHelper {
   }
 
   /// استخراج الموقع من body الإشعار
-  String _extractLocation(String? body) {
+  static String extractLocation(String? body) {
     if (body == null) return 'غير محدد';
     // TODO: تحسين الاستخراج بناءً على صيغة الإشعار من Backend
     final parts = body.split(':');
@@ -472,17 +490,6 @@ class NotificationsHelper {
       _handleDataMessage(message.data!);
     }
   }
-  @pragma('vm:entry-point')
-  Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
 
-    final helper = NotificationsHelper();
-
-    if (message.notification != null) {
-      helper.handleBackgroundNotification(message);
-    }
-  }
 
 }

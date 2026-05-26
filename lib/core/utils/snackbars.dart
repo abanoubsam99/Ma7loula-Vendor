@@ -6,10 +6,11 @@ import 'package:top_snackbar_flutter/top_snack_bar.dart';
 
 enum SnackbarStatus { success, error, info }
 
-void showSnackbar(
-    {required BuildContext context,
-    required SnackbarStatus status,
-    required String message}) {
+void showSnackbar({
+  required BuildContext context,
+  required SnackbarStatus status,
+  required String message,
+}) {
   switch (status) {
     case SnackbarStatus.success:
       showTopSnackBar(
@@ -20,8 +21,10 @@ void showSnackbar(
           backgroundColor: ColorsPalette.green,
           boxShadow: const [],
         ),
+        displayDuration: const Duration(seconds: 6),
       );
       break;
+
     case SnackbarStatus.error:
       showTopSnackBar(
         Overlay.of(context),
@@ -30,8 +33,10 @@ void showSnackbar(
           maxLines: 3,
           boxShadow: const [],
         ),
+        displayDuration: const Duration(seconds: 6),
       );
       break;
+
     case SnackbarStatus.info:
       showTopSnackBar(
         Overlay.of(context),
@@ -41,6 +46,7 @@ void showSnackbar(
           backgroundColor: ColorsPalette.primaryColor,
           boxShadow: const [],
         ),
+        displayDuration: const Duration(seconds: 6),
       );
       break;
   }

@@ -20,6 +20,8 @@ import 'package:ma7lola_vendor/model/tires_type_model.dart';
 import 'package:ma7lola_vendor/model/winch/winch_previous_orders.dart';
 
 import '../../../../../model/winch/order_details_model.dart' as winchOrder;
+import '../../../../controller/SessionManager.dart';
+import '../../../../controller/handleDioError.dart';
 import '../../../../model/about_app.dart';
 import '../../../../model/add_tire_model.dart';
 import '../../../../model/address_model.dart';
@@ -1893,32 +1895,44 @@ class MiscellaneousApi {
     }
   }
 
-  static Future<ImageModel> uploadImage(
-      {required File? image, required Locale locale}) async {
+  static Future<ImageModel> uploadImage({
+    required File? image,
+    required Locale locale,
+  }) async {
     try {
-      final i = await MultipartFile.fromFile('${image?.path}');
-      FormData file = FormData.fromMap({
-        'media[]': [i]
+      if (image == null) {
+        throw ApiException("No image selected");
+      }
+
+      final token = await SecureStorageService.instance
+          .readString(key: SecureStorageKeys.token);
+
+      final file = await MultipartFile.fromFile(
+        image.path,
+        filename: image.path.split('/').last,
+      );
+
+      final formData = FormData.fromMap({
+        'media[]': file
       });
 
-      final response = await ApiClient.instance.dio.post('media/upload',
-          options: Options(headers: {
-            'lang': locale.languageCode,
-          }),
-          data: file);
+      final response = await ApiClient.instance.dio.post(
+        'media/upload',
+        data: formData,
+        options: Options(headers: {
+          'Authorization': 'Bearer $token',
+          'lang': locale.languageCode,
+        }),
+      );
 
-      ImageModel imageModel = ImageModel.fromJson(response.data);
-
-      return imageModel;
-    } on DioError catch (error) {
-      Helpers.debugDioError(error);
-      rethrow;
+      return ImageModel.fromJson(response.data);
+    } on DioException catch (error) {
+      final message = handleDioError(error);
+      throw ApiException(message);
     } catch (error) {
-      log(error.toString());
-      throw LocaleKeys.genericErrorMessage.tr();
+      throw ApiException("Unexpected error occurred");
     }
   }
-
   static Future<AddTireModel> addTire({
     required String description,
     required String sku,
@@ -2269,25 +2283,90 @@ class MiscellaneousApi {
     required double lat,
     required double lon,
   }) async {
-    final token = await SecureStorageService.instance
-        .readString(key: SecureStorageKeys.token);
+
+    /// prevent duplicate recursion
+    if (_isGettingOffers) {
+      return WinchOffersModel();
+    }
+
+    _isGettingOffers = true;
+
     try {
+
+      final token = await SecureStorageService.instance.readString(key: SecureStorageKeys.token);
+
+      /// stop after logout
+      if (token == null || token.isEmpty) {
+        return WinchOffersModel(
+          message: 'Token not found',
+          data: null,
+        );
+      }
+      if (SessionManager.isLoggedOut) {
+        return WinchOffersModel(
+          message: 'Logged out',
+          data: null,
+        );
+      }
+
       final response = await ApiClient.instance.dio.get(
         getWinchOffersEndPoint,
-        options: Options(headers: {
-          'Authorization': 'Bearer $token',
-          'lang': locale.languageCode,
-        }),
+        cancelToken: SessionManager.cancelToken,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'lang': locale.languageCode,
+          },
+
+          validateStatus: (status) => true,
+        ),
       );
-      print("token============ ${token}");
-      updateWinchLocation(locale: locale, lat: lat, lon: lon);
+
+      print("token============ $token");
+
+      /// unauthorized
+      if (response.statusCode == 401) {
+        return WinchOffersModel(
+          message: 'Unauthorized',
+          data: null,
+        );
+      }
+
+      /// safe fire-and-forget
+      Future.microtask(() async {
+        if (!_isUpdatingLocation) {
+          await updateWinchLocation(
+            locale: locale,
+            lat: lat,
+            lon: lon,
+          );
+        }
+      });
+
       return WinchOffersModel.fromJson(response.data);
+
     } on DioError catch (error) {
+
       Helpers.debugDioError(error);
-      rethrow;
+
+      return WinchOffersModel(
+        message: 'Network error',
+        data: null,
+      );
+
     } catch (error) {
+
       log(error.toString());
-      throw LocaleKeys.genericErrorMessage.tr();
+
+      return WinchOffersModel(
+        message: LocaleKeys.genericErrorMessage.tr(),
+        data: null,
+      );
+
+    } finally {
+
+      _isGettingOffers = false;
+
     }
   }
 
@@ -2598,34 +2677,93 @@ class MiscellaneousApi {
       throw tagsJson;
     }
   }
-
+  static bool _isUpdatingLocation = false;
+  static bool _isGettingOffers = false;
   static Future<UpdateLocationModel> updateWinchLocation({
     required Locale locale,
     required double lat,
     required double lon,
   }) async {
-    final token = await SecureStorageService.instance
-        .readString(key: SecureStorageKeys.token);
+
+    /// prevent duplicate recursion
+    if (_isUpdatingLocation) {
+      return UpdateLocationModel();
+    }
+
+    _isUpdatingLocation = true;
+
     try {
+
+      final token = await SecureStorageService.instance
+          .readString(key: SecureStorageKeys.token);
+
+      /// stop after logout
+      if (token == null || token.isEmpty) {
+        return UpdateLocationModel(
+          message: 'Token not found',
+        );
+      }
+
       final response = await ApiClient.instance.dio.post(
         updateLocationEndPoint,
-        data: {"lat": lat, "lon": lon},
-        options: Options(headers: {
-          'Authorization': 'Bearer $token',
-          'lang': locale.languageCode,
-        }),
+        data: {
+          "lat": lat,
+          "lon": lon,
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'lang': locale.languageCode,
+          },
+
+          validateStatus: (status) => true,
+        ),
       );
-      print("Api == ${updateLocationEndPoint}");
-      print("lat == ${lat}");
-      print("lon == ${lon}");
-      getWinchOffers(locale: locale,lat: lat ,lon: lon);
+
+      print("Api == $updateLocationEndPoint");
+      print("lat == $lat");
+      print("lon == $lon");
+
+      /// unauthorized
+      if (response.statusCode == 401) {
+        return UpdateLocationModel(
+          message: 'Unauthorized',
+        );
+      }
+
+      /// safe fire-and-forget
+      Future.microtask(() async {
+        if (!_isGettingOffers) {
+          await getWinchOffers(
+            locale: locale,
+            lat: lat,
+            lon: lon,
+          );
+        }
+      });
+
       return UpdateLocationModel.fromJson(response.data);
+
     } on DioError catch (error) {
+
       Helpers.debugDioError(error);
-      rethrow;
+
+      return UpdateLocationModel(
+        message: 'Network error',
+      );
+
     } catch (error) {
+
       log(error.toString());
-      throw LocaleKeys.genericErrorMessage.tr();
+
+      return UpdateLocationModel(
+        message: LocaleKeys.genericErrorMessage.tr(),
+      );
+
+    } finally {
+
+      _isUpdatingLocation = false;
+
     }
   }
 

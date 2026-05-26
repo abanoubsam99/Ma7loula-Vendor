@@ -699,7 +699,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
         return WinchOrderDetails(
           orderNum: widget.orderNum,
           vendorName: widget.vendorName,
-          vendorNum: widget.vendorNum,
+          userNum: widget.vendorNum,
         );
       }));
       showSnackbar(
