@@ -360,6 +360,8 @@ class _EmergencyOrderDetailsState extends State<EmergencyOrderDetails> {
                         ]),
                       ),
                     ],
+                      UtilValues.gap48,
+                      UtilValues.gap48,
                   ],
                 ),
               ));

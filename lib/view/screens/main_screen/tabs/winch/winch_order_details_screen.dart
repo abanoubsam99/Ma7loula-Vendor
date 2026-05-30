@@ -402,6 +402,8 @@ class _WinchOrderDetailsState extends State<WinchOrderDetails> {
                         ]),
                       ),
                     ],
+                      UtilValues.gap48,
+                      UtilValues.gap48,
                   ],
                 ),
               ));

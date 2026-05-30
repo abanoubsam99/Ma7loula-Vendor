@@ -450,6 +450,8 @@ class _OrderDetailsState extends State<OrderDetails> {
                             )
                           ]),
                         ),
+                        UtilValues.gap48,
+                        UtilValues.gap48,
                       ],
                     ),
                   ));
