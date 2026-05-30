@@ -36,7 +36,7 @@ class AppConfig {
     IntroScreens.routeName: (_) => const IntroScreens(),
     // PostScreen.routeName:(_) => const PostScreen(),
     RegisterScreen.routeName: (_) => RegisterScreen(),
-    ChatScreen.routeName: (_) => ChatScreen(),
+    // ChatScreen.routeName: (_) => ChatScreen(),
     EditProfileScreen.routeName: (_) => EditProfileScreen(),
     NotificationsScreen.routeName: (_) => NotificationsScreen(),
     // OtpScreen.routeName: (_) => OtpScreen(),

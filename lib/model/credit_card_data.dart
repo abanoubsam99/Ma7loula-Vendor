@@ -1,3 +1,5 @@
+// Temporarily disabled — unused, kept for reference. Do not delete.
+/*
 class CreditCardData {
   String? holderName;
   String? number;
@@ -13,3 +15,4 @@ class CreditCardData {
     this.cvv,
   });
 }
+*/
