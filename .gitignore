@@ -47,3 +47,9 @@ app.*.map.json
 #build files for CMake and ndk-build
 /android/app/.cxx/
 /android/.kotlin/
+
+# macOS metadata
+._*
+.DS_Store 
+._.*
+.env
