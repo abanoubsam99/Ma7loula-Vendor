@@ -1,3 +1,5 @@
+// Temporarily disabled — unused, kept for reference. Do not delete.
+/*
 import 'package:awesome_card/awesome_card.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -257,14 +259,14 @@ class _CreditCardBottomSheetState extends State<CreditCardBottomSheet> {
 
         //final htmlBody = submittedCardResponse.htmlBody.replaceAll('\\', '');
 
-        /*await Navigator.of(context).push(
-          MaterialPageRoute(
-            fullscreenDialog: true,
-            builder: (context) {
-              return PaymentWebViewScreen(html: htmlBody);
-            },
-          ),
-        );*/
+        //await Navigator.of(context).push(
+        //  MaterialPageRoute(
+        //    fullscreenDialog: true,
+        //    builder: (context) {
+        //      return PaymentWebViewScreen(html: htmlBody);
+        //    },
+        //  ),
+        //);
 
         //Navigator.of(context).pop([_creditCard, submittedCardResponse]);
       }
@@ -279,3 +281,4 @@ class _CreditCardBottomSheetState extends State<CreditCardBottomSheet> {
     }
   }
 }
+*/

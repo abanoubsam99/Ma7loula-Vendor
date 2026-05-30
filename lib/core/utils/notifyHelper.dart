@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -15,11 +17,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   );
 
   final helper = NotificationsHelper();
-
-  if (message.notification != null) {
-    helper.handleBackgroundNotification(message);
-    NotificationsHelper.showFullScreenOrderAlert(message.data);
-  }
+  await helper._ensureBackgroundReady();
+  await helper.processIncomingMessage(message);
 }
 class NotificationsHelper {
 
@@ -29,6 +28,13 @@ class NotificationsHelper {
   NotificationsHelper._internal();
 
   FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  
+  static const String orderChannelId = 'order_alerts_channel';
+  static const String visitChannelId = 'visit_alerts_channel';
+
+  /// نمط اهتزاز قوي: انتظار → اهتزاز طويل × 4
+  static final Int64List _strongVibrationPattern =
+      Int64List.fromList([0, 800, 400, 800, 400, 800, 400, 1200]);
   
   // Global Navigator Key للوصول للـ context من أي مكان
   static GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -92,33 +98,82 @@ class NotificationsHelper {
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
 
-    // إنشاء قناة إشعارات عالية الأهمية للطلبات
-    const AndroidNotificationChannel orderChannel = AndroidNotificationChannel(
-      'order_alerts_channel',
+    final androidPlugin = flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+    await androidPlugin?.requestNotificationsPermission();
+
+    // إنشاء قناة إشعارات عالية الأهمية للطلبات (تظهر من فوق الشاشة + صوت + اهتزاز)
+    final AndroidNotificationChannel orderChannel = AndroidNotificationChannel(
+      orderChannelId,
       'طلبات التوصيل',
       description: 'إشعارات الطلبات الجديدة للمندوبين',
       importance: Importance.max,
       playSound: true,
       enableVibration: true,
+      vibrationPattern: _strongVibrationPattern,
       showBadge: true,
+      enableLights: true,
+      ledColor: const Color.fromARGB(255, 255, 0, 0),
     );
 
     // إنشاء قناة إشعارات للزيارات
-    const AndroidNotificationChannel visitChannel = AndroidNotificationChannel(
-      'visit_alerts_channel',
+    final AndroidNotificationChannel visitChannel = AndroidNotificationChannel(
+      visitChannelId,
       'مواعيد الزيارات',
       description: 'تنبيهات مواعيد الزيارات للمندوبين',
       importance: Importance.max,
       playSound: true,
       enableVibration: true,
+      vibrationPattern: _strongVibrationPattern,
+      showBadge: true,
+      enableLights: true,
+      ledColor: const Color.fromARGB(255, 255, 165, 0),
+    );
+
+    await androidPlugin?.createNotificationChannel(orderChannel);
+    await androidPlugin?.createNotificationChannel(visitChannel);
+  }
+
+  /// تهيئة الإشعارات المحلية في الـ background isolate
+  Future<void> _ensureBackgroundReady() async {
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const DarwinInitializationSettings iOSSettings = DarwinInitializationSettings();
+    const InitializationSettings settings = InitializationSettings(
+      android: androidSettings,
+      iOS: iOSSettings,
+    );
+
+    await flutterLocalNotificationsPlugin.initialize(settings);
+
+    final androidPlugin = flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+    final AndroidNotificationChannel orderChannel = AndroidNotificationChannel(
+      orderChannelId,
+      'طلبات التوصيل',
+      description: 'إشعارات الطلبات الجديدة للمندوبين',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: _strongVibrationPattern,
       showBadge: true,
     );
 
-    final plugin = flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    
-    await plugin?.createNotificationChannel(orderChannel);
-    await plugin?.createNotificationChannel(visitChannel);
+    final AndroidNotificationChannel visitChannel = AndroidNotificationChannel(
+      visitChannelId,
+      'مواعيد الزيارات',
+      description: 'تنبيهات مواعيد الزيارات للمندوبين',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: _strongVibrationPattern,
+      showBadge: true,
+    );
+
+    await androidPlugin?.createNotificationChannel(orderChannel);
+    await androidPlugin?.createNotificationChannel(visitChannel);
   }
 
   /// Setup listeners for Firebase Cloud Messaging
@@ -172,25 +227,52 @@ class NotificationsHelper {
 
   /// Handle incoming FCM notifications when the app is in the foreground
   void _handleIncomingNotification(RemoteMessage message) {
-    if (message.data!=null) {
-      _handleDataMessage(message.data);
+    processIncomingMessage(message, showFullScreen: true);
+  }
+
+  /// معالجة الإشعار الوارد (foreground / background)
+  Future<void> processIncomingMessage(
+    RemoteMessage message, {
+    bool showFullScreen = false,
+  }) async {
+    final title = message.notification?.title ??
+        message.data['title']?.toString() ??
+        'طلب توصيل جديد 🚨';
+    final body = message.notification?.body ??
+        message.data['body']?.toString() ??
+        'لديك إشعار جديد يحتاج انتباهك';
+    final type = _resolveNotificationType(message.data, title, body);
+
+    await _showHighPriorityNotification(title, body, type);
+
+    if (showFullScreen && message.data.isNotEmpty) {
+      showFullScreenOrderAlert(message.data);
     }
   }
 
-  /// Handle FCM data messages (background or foreground)
-  void _handleDataMessage(Map<String, dynamic> data) {
-    // _showFullScreenOrderAlert(data);
+  String _resolveNotificationType(
+    Map<String, dynamic> data,
+    String title,
+    String body,
+  ) {
+    final combined = '$title $body'.toLowerCase();
+    if (combined.contains('زيارة') || combined.contains('visit')) {
+      return 'visit';
+    }
+    return 'order';
+  }
 
-    // // التحقق من نوع الإشعار
-    // // final notificationType = _getNotificationType(data);
-    //
-    // if (data !=null &&(data[""]) 'visit') {
-    //   // عرض Full Screen Alert للزيارة
-    //   _showFullScreenVisitAlert(data);
-    // } else {
-    //   // عرض Full Screen Alert للطلب الجديد
-    //   _showFullScreenOrderAlert(data);
-    // }
+  /// Handle FCM data messages (background or foreground)
+  Future<void> _handleDataMessage(Map<String, dynamic> data) async {
+    final title = data['title']?.toString() ?? 'طلب توصيل جديد 🚨';
+    final body = data['body']?.toString() ?? 'لديك إشعار جديد يحتاج انتباهك';
+    final type = _resolveNotificationType(data, title, body);
+
+    await _showHighPriorityNotification(title, body, type);
+
+    if (navigatorKey.currentContext != null) {
+      showFullScreenOrderAlert(data);
+    }
   }
   
   // /// تحديد نوع الإشعار (طلب أو زيارة)
@@ -364,27 +446,32 @@ class NotificationsHelper {
     return dateMatch?.group(0) ?? 'غير محدد';
   }
 
-  /// عرض إشعار ذو أولوية عالية (Backup للـ Full Screen Alert)
+  /// عرض إشعار ذو أولوية عالية — يظهر من فوق الشاشة مع صوت واهتزاز قوي
   Future<void> _showHighPriorityNotification(String? title, String? body, String type) async {
     final isVisit = type == 'visit';
-    final channelId = isVisit ? 'visit_alerts_channel' : 'order_alerts_channel';
+    final channelId = isVisit ? visitChannelId : orderChannelId;
     final channelName = isVisit ? 'مواعيد الزيارات' : 'طلبات التوصيل';
-    final channelDesc = isVisit 
+    final channelDesc = isVisit
         ? 'تنبيهات مواعيد الزيارات للمندوبين'
         : 'إشعارات الطلبات الجديدة للمندوبين';
-    
+
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       channelId,
       channelName,
       channelDescription: channelDesc,
       importance: Importance.max,
-      priority: Priority.high,
+      priority: Priority.max,
       playSound: true,
       enableVibration: true,
-      fullScreenIntent: true, // مهم جداً للأندرويد
+      vibrationPattern: _strongVibrationPattern,
+      fullScreenIntent: true,
       category: AndroidNotificationCategory.alarm,
-      ticker: isVisit ? 'موعد زيارة قريب' : 'طلب توصيل جديد',
- //     sound: RawResourceAndroidNotificationSound('order_alert'),
+      visibility: NotificationVisibility.public,
+      ticker: isVisit ? 'موعد زيارة قريب 🚨' : 'طلب توصيل جديد 🚨',
+      autoCancel: true,
+      ongoing: false,
+      channelAction: AndroidNotificationChannelAction.createIfNotExists,
+      additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT — يكرر الصوت لحد ما اليوزر يشوفه
       styleInformation: BigTextStyleInformation(
         body ?? '',
         contentTitle: title,
@@ -486,9 +573,7 @@ class NotificationsHelper {
     print("Subscribed to topic: $topic");
   }
   void handleBackgroundNotification(RemoteMessage message) {
-    if (message.notification != null) {
-      _handleDataMessage(message.data!);
-    }
+    processIncomingMessage(message);
   }
 
 

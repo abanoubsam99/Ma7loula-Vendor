@@ -14,7 +14,7 @@ dependencies:
 #  animated_splash_screen: ^1.3.0
 #  animated_text_kit:
 #  flame_splash_screen: ^0.1.0
-  awesome_card: ^1.1.7
+#  awesome_card: ^1.1.7
   cached_network_image: ^3.2.3
   carousel_slider: ^5.0.0
   collection: ^1.16.0
@@ -40,7 +40,7 @@ dependencies:
   intl: any
 #  introduction_screen: ^3.1.1
 #  label_marker: ^1.0.1
-  location: ^5.0.3
+#  location: ^5.0.3
 #  phone_form_field: ^8.1.0
   pin_code_fields: ^8.0.1
 #  pretty_dio_logger: ^1.2.0-beta-1
@@ -61,10 +61,10 @@ dependencies:
 #  google_sign_in: ^6.0.1
 #  sign_in_with_apple: ^7.0.1
 #  progress_indicator: ^0.2.2
-  get: ^4.6.5
+#  get: ^4.6.5
 #  inkblob_navigation_bar: ^0.1.2
   flutter_local_notifications: ^18.0.1
-  toast: ^0.3.0
+#  toast: ^0.3.0
   fluttertoast: ^8.2.1
 #  flutter_dialogs: ^3.0.0
 #  bdd_widget_test: ^1.6.0
@@ -76,7 +76,7 @@ dependencies:
 #  smooth_star_rating_null_safety: ^1.0.4+2
 #  modal_progress_hud_nsn: ^0.5.1
 #  flutter_calendar_carousel:
-  cloud_firestore:
+#  cloud_firestore:
 #  animated_rating_stars: ^1.0.1
 #  camera: ^0.10.0
 #  google_mlkit_text_recognition: ^0.14.0

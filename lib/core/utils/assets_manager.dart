@@ -10,16 +10,16 @@ class AssetsManager {
   static const splash = '$_imagesFolder/splash.png';
   static const cars = '$_imagesFolder/cars.png';
   static const backgroundLogo = '$_imagesFolder/34.png';
-  static const selectOperator = '$_imagesFolder/select_operator.png';
-  static const path = '$_imagesFolder/path1.png';
-  static const path2 = '$_imagesFolder/path2.png';
-  static const authInd = '$_imagesFolder/auth_ind.png';
-  static const authCom = '$_imagesFolder/auth_com.png';
-  static const marker = '$_imagesFolder/marker.png';
-  static const bottom = '$_imagesFolder/bottom.png';
-  static const person = '$_imagesFolder/person.png';
-  static const filter = '$_imagesFolder/filter.png';
-  static const save = '$_imagesFolder/save.png';
+  // static const selectOperator = '$_imagesFolder/select_operator.png';
+  // static const path = '$_imagesFolder/path1.png';
+  // static const path2 = '$_imagesFolder/path2.png';
+  // static const authInd = '$_imagesFolder/auth_ind.png';
+  // static const authCom = '$_imagesFolder/auth_com.png';
+  // static const marker = '$_imagesFolder/marker.png';
+  // static const bottom = '$_imagesFolder/bottom.png';
+  // static const person = '$_imagesFolder/person.png';
+  // static const filter = '$_imagesFolder/filter.png';
+  // static const save = '$_imagesFolder/save.png';
   static const home = '$_imagesFolder/home.svg';
   static const user = '$_imagesFolder/user.svg';
   static const fileList = '$_imagesFolder/file-list.svg';
@@ -27,19 +27,19 @@ class AssetsManager {
   static const myProducts = '$_imagesFolder/my_products.svg';
   static const myProductsBox = '$_imagesFolder/box_products.svg';
 
-  static const software = '$_imagesFolder/code.png';
-  static const marketing = '$_imagesFolder/advertising.png';
-  static const media = '$_imagesFolder/s2.png';
-  static const businessRelated = '$_imagesFolder/users.png';
-  static const artAndDesign = '$_imagesFolder/s1.png';
-  static const contentAndTranslation = '$_imagesFolder/edit.png';
+  // static const software = '$_imagesFolder/code.png';
+  // static const marketing = '$_imagesFolder/advertising.png';
+  // static const media = '$_imagesFolder/s2.png';
+  // static const businessRelated = '$_imagesFolder/users.png';
+  // static const artAndDesign = '$_imagesFolder/s1.png';
+  // static const contentAndTranslation = '$_imagesFolder/edit.png';
 
   // Onboarding
-  static const onboarding1 = '$_onBoardingFolder/onboarding1.png';
-  static const onboarding2 = '$_onBoardingFolder/onboarding2.png';
-  static const onboarding3 = '$_onBoardingFolder/onboarding3.png';
-  static const onboarding4 = '$_onBoardingFolder/onboarding4.png';
-  static const onboarding5 = '$_onBoardingFolder/onboarding5.png';
+  // static const onboarding1 = '$_onBoardingFolder/onboarding1.png';
+  // static const onboarding2 = '$_onBoardingFolder/onboarding2.png';
+  // static const onboarding3 = '$_onBoardingFolder/onboarding3.png';
+  // static const onboarding4 = '$_onBoardingFolder/onboarding4.png';
+  // static const onboarding5 = '$_onBoardingFolder/onboarding5.png';
 
   // Choose Language
   static const arabic = '$_imagesFolder/arabic.svg';
@@ -54,13 +54,13 @@ class AssetsManager {
   static const list = '$_imagesFolder/document-list.svg';
   static const facebook = '$_imagesFolder/facebook.svg';
   static const instagram = '$_imagesFolder/instagram.svg';
-  static const youtube = '$_imagesFolder/youtube.svg';
+  // static const youtube = '$_imagesFolder/youtube.svg';
   static const whatsapp = '$_imagesFolder/whatsapp.svg';
   static const shieldUser = '$_imagesFolder/shield-user.svg';
   static const chatInfo = '$_imagesFolder/chat-info.svg';
 
   static const fileList1 = '$_imagesFolder/file-list1.svg';
-  static const taxi = '$_imagesFolder/taxi.svg';
+  // static const taxi = '$_imagesFolder/taxi.svg';
   static const location = '$_imagesFolder/location-pin-check.svg';
   static const logout = '$_imagesFolder/log-out.svg';
 
@@ -88,8 +88,8 @@ class AssetsManager {
   static const addCircle = '$_imagesFolder/plus-circle.svg';
   static const rightCircle = '$_imagesFolder/angle-right-circle.svg';
   static const minus = '$_imagesFolder/minus.svg';
-  static const map = '$_imagesFolder/maps.svg';
-  static const schedule = '$_imagesFolder/schedule.svg';
+  // static const map = '$_imagesFolder/maps.svg';
+  // static const schedule = '$_imagesFolder/schedule.svg';
   static const masterCard = '$_imagesFolder/mastercard.svg';
   static const cash = '$_imagesFolder/cash.svg';
   static const visa = '$_imagesFolder/visa.svg';
