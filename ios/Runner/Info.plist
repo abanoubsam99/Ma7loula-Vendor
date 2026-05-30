@@ -24,11 +24,11 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>$(FLUTTER_BUILD_NAME)</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>tel</string>
@@ -38,11 +38,11 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera permission is required for ID scanning</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs access to location when open to add your address and deliver required service</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>This app needs access to location when open to add your address and deliver required service</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs access to location when open to add your address and deliver required service</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>This app needs access to location when open to add your address and deliver required service</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Camera permission is required for ID scanning</string>

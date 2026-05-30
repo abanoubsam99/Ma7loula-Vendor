@@ -66,11 +66,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCdsTVFzMyuWRUJVvvh0fWqPs-UxcMgtZ8',
-    appId: '1:160217474119:ios:f04d931bce9628bcdefd62',
+    appId: '1:160217474119:ios:7708f6282e856999defd62',
     messagingSenderId: '160217474119',
     projectId: 'ma7lola-75b28',
     storageBucket: 'ma7lola-75b28.firebasestorage.app',
-    iosBundleId: 'com.ma7lola.ma7lola',
+    iosBundleId: 'com.ma7lola.ma7lolaVendor',
   );
 
 }
