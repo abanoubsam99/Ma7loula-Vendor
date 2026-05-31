@@ -78,6 +78,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
   Set<Marker> _markers = {};
   List<LatLng> polylineCoordinates = [];
   bool _isLoading = true;
+  bool _hasFetchedPendingRequest = false;
 
   Future<void> openGoogleMapsDirections() async {
     bool serviceEnabled;
@@ -117,16 +118,16 @@ class _MapRoutePageState extends State<MapRoutePage> {
     // Get current location
     Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high);
-    currentLocation=position;
-    setState(() {    });
-    final String googleMapsUrl =
-        'https://www.google.com/maps/dir/?api=1'
+    currentLocation = position;
+    setState(() {});
+    final String googleMapsUrl = 'https://www.google.com/maps/dir/?api=1'
         '&origin=${position.latitude},${position.longitude}'
         '&destination=${widget.toLat},${widget.toLon}'
         '&travelmode=driving';
 
     if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
-      await launchUrl(Uri.parse(googleMapsUrl), mode: LaunchMode.externalApplication);
+      await launchUrl(Uri.parse(googleMapsUrl),
+          mode: LaunchMode.externalApplication);
     } else {
       showSnackbar(
         context: context,
@@ -135,6 +136,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
       );
     }
   }
+
   @override
   void initState() {
     super.initState();
@@ -142,16 +144,33 @@ class _MapRoutePageState extends State<MapRoutePage> {
       _getRoutePolyline();
     });
   }
-  
+
+  Future<void> _fetchPendingRequest() async {
+    if (_hasFetchedPendingRequest) return;
+    _hasFetchedPendingRequest = true;
+
+    if (currentLocation == null) return;
+
+    try {
+      await context.read<GetWinchOffersProvider>().getPendingRequest(
+            locale: context.locale,
+            lat: currentLocation!.latitude,
+            lon: currentLocation!.longitude,
+          );
+    } catch (_) {
+      // ignore errors here; provider will handle retries via timer if needed
+    }
+  }
+
   // Get detailed route polyline from Google Directions API
   Future<void> _getRoutePolyline() async {
     Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high);
-    currentLocation=position;
+    currentLocation = position;
     setState(() {
       _isLoading = true;
     });
-    
+
     // Add markers for pickup and dropoff locations
     _markers.add(
       Marker(
@@ -174,18 +193,19 @@ class _MapRoutePageState extends State<MapRoutePage> {
     try {
       // Clear existing polylines
       polylineCoordinates = [];
-      
+
       dev.log("🔍 Attempting to get route between locations");
-      
+
       bool routeFound = false;
       PolylinePoints polylinePoints = PolylinePoints();
-      
+
       // Make direct HTTP request to Google Directions API - First attempt
       try {
         const String apiKey1 = '$googleMapApiKey';
-        
-        dev.log("💡 Attempt 1: Using API key: $apiKey1 with direct HTTP request");
-        
+
+        dev.log(
+            "💡 Attempt 1: Using API key: $apiKey1 with direct HTTP request");
+
         final response = await http.get(
           Uri.parse('https://maps.googleapis.com/maps/api/directions/json?'
               'origin=${widget.fromLat},${widget.fromLon}'
@@ -193,22 +213,21 @@ class _MapRoutePageState extends State<MapRoutePage> {
               '&mode=driving'
               '&key=$apiKey1'),
         );
-        
+
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           if (data['status'] == 'OK') {
             // Get route points from the API response
             List<dynamic> steps = data['routes'][0]['legs'][0]['steps'];
-            
+
             for (var step in steps) {
               String points = step['polyline']['points'];
-              polylineCoordinates.addAll(
-                polylinePoints.decodePolyline(points).map(
-                  (point) => LatLng(point.latitude, point.longitude)
-                )
-              );
+              polylineCoordinates.addAll(polylinePoints
+                  .decodePolyline(points)
+                  .map((point) => LatLng(point.latitude, point.longitude)));
             }
-            dev.log("✅ Attempt 1 succeeded: Got ${polylineCoordinates.length} route points");
+            dev.log(
+                "✅ Attempt 1 succeeded: Got ${polylineCoordinates.length} route points");
             routeFound = true;
           } else {
             dev.log("⚠️ Attempt 1 failed: ${data['status']}");
@@ -219,14 +238,15 @@ class _MapRoutePageState extends State<MapRoutePage> {
       } catch (e) {
         dev.log("❌ Attempt 1 exception: $e");
       }
-      
+
       // Second attempt with different API key if first attempt failed
       if (!routeFound) {
         try {
           const String apiKey2 = '$googleMapApiKey';
-          
-          dev.log("💡 Attempt 2: Using API key: $apiKey2 with direct HTTP request");
-          
+
+          dev.log(
+              "💡 Attempt 2: Using API key: $apiKey2 with direct HTTP request");
+
           final response = await http.get(
             Uri.parse('https://maps.googleapis.com/maps/api/directions/json?'
                 'origin=${widget.fromLat},${widget.fromLon}'
@@ -234,27 +254,27 @@ class _MapRoutePageState extends State<MapRoutePage> {
                 '&mode=driving'
                 '&key=$apiKey2'),
           );
-          
+
           if (response.statusCode == 200) {
             final data = json.decode(response.body);
             if (data['status'] == 'OK') {
               // Get route points from the API response
               List<dynamic> steps = data['routes'][0]['legs'][0]['steps'];
-              
+
               polylineCoordinates = []; // Clear any previous points
               for (var step in steps) {
                 String points = step['polyline']['points'];
-                polylineCoordinates.addAll(
-                  polylinePoints.decodePolyline(points).map(
-                    (point) => LatLng(point.latitude, point.longitude)
-                  )
-                );
+                polylineCoordinates.addAll(polylinePoints
+                    .decodePolyline(points)
+                    .map((point) => LatLng(point.latitude, point.longitude)));
               }
-              dev.log("✅ Attempt 2 succeeded: Got ${polylineCoordinates.length} route points");
+              dev.log(
+                  "✅ Attempt 2 succeeded: Got ${polylineCoordinates.length} route points");
               routeFound = true;
             } else {
               dev.log("⚠️ Attempt 2 failed: ${data['status']}");
-              dev.log("⚠️ IMPORTANT: Enable the Directions API in the Google Cloud Console!");
+              dev.log(
+                  "⚠️ IMPORTANT: Enable the Directions API in the Google Cloud Console!");
             }
           } else {
             dev.log("⚠️ Error fetching route data: ${response.statusCode}");
@@ -263,16 +283,17 @@ class _MapRoutePageState extends State<MapRoutePage> {
           dev.log("❌ Attempt 2 exception: $e");
         }
       }
-      
+
       // If we still don't have a route, use direct line fallback
       if (!routeFound) {
-        dev.log("⚠️ All attempts to get route failed - using direct line fallback");
+        dev.log(
+            "⚠️ All attempts to get route failed - using direct line fallback");
         polylineCoordinates = [
           LatLng(widget.fromLat, widget.fromLon),
           LatLng(widget.toLat, widget.toLon),
         ];
       }
-      
+
       // Add the polyline to the map
       setState(() {
         _polylines.add(
@@ -285,7 +306,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
         );
         _isLoading = false;
       });
-      
+
       // Fit map bounds to show the route
       if (mapController != null && polylineCoordinates.isNotEmpty) {
         final bounds = _getBounds(polylineCoordinates);
@@ -310,9 +331,13 @@ class _MapRoutePageState extends State<MapRoutePage> {
         );
         _isLoading = false;
       });
+    } finally {
+      if (mounted) {
+        await _fetchPendingRequest();
+      }
     }
   }
-  
+
   // Calculate bounds to fit all polyline points
   // Calculate bounds to fit all polyline points
   LatLngBounds _getBounds(List<LatLng> points) {
@@ -333,13 +358,13 @@ class _MapRoutePageState extends State<MapRoutePage> {
       northeast: LatLng(maxLat, maxLng),
     );
   }
-  
+
   // Deprecated - now using _getBounds instead
   void _zoomToBounds() {
     if (polylineCoordinates.isEmpty || mapController == null) {
       return;
     }
-    
+
     final bounds = _getBounds(polylineCoordinates);
     mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
   }
@@ -353,7 +378,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
   Widget build(BuildContext context) {
     final double height = MediaQuery.of(context).size.height;
     final double width = MediaQuery.of(context).size.width;
-    
+
     return Scaffold(
       appBar: AppBarApp(
         title: '${LocaleKeys.orderNumber.tr()} ${widget.orderNum}',
@@ -384,12 +409,13 @@ class _MapRoutePageState extends State<MapRoutePage> {
               }
             },
           ),
-          
+
           // Loading indicator overlay - shown while calculating route
           if (_isLoading)
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
@@ -404,7 +430,8 @@ class _MapRoutePageState extends State<MapRoutePage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(color: ColorsPalette.primaryColor),
+                    CircularProgressIndicator(
+                        color: ColorsPalette.primaryColor),
                     const SizedBox(height: 16),
                     Text(
                       'جاري حساب المسار...',
@@ -414,7 +441,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
                 ),
               ),
             ),
-          
+
           // Bottom info panel
           Positioned(
             left: 0,
@@ -451,12 +478,14 @@ class _MapRoutePageState extends State<MapRoutePage> {
                     ],
                   ),
                   UtilValues.gap8,
-                  
+
                   //  servicesPrice
-                  Row(crossAxisAlignment: CrossAxisAlignment.start ,mainAxisAlignment: MainAxisAlignment.end,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       Text(
-                        '${widget.user.name??""}',
+                        '${widget.user.name ?? ""}',
                         style: TextStyle(
                             color: ColorsPalette.black,
                             fontSize: 15.sp,
@@ -479,7 +508,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
                   Row(
                     children: [
                       Text(
-                        widget.user.phone??"",
+                        widget.user.phone ?? "",
                         style: TextStyle(
                           color: ColorsPalette.black,
                           fontWeight: FontWeight.w400,
@@ -534,7 +563,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
                     ],
                   ),
                   UtilValues.gap8,
-                  
+
                   // To location
                   Row(
                     children: [
@@ -568,14 +597,9 @@ class _MapRoutePageState extends State<MapRoutePage> {
                     ],
                   ),
                   UtilValues.gap12,
-                  
+
                   // Action buttons
                   Builder(builder: (context) {
-                    context
-                        .read<GetWinchOffersProvider>()
-                        .getPendingRequest(locale: context.locale
-                      ,lon: currentLocation?.longitude ?? 0.0,
-                      lat: currentLocation?.latitude ?? 0.0, );
                     return SizedBox(
                       height: 43,
                       child: Row(children: [
@@ -609,15 +633,26 @@ class _MapRoutePageState extends State<MapRoutePage> {
                             ),
                             child: SimplePrimaryButton(
                               borderRadius: BorderRadius.circular(5),
-                              label: context.watch<GetWinchOffersProvider>().listRequests.data?.acceptedOffer != null ?LocaleKeys.call.tr():LocaleKeys.reject.tr(),
-                              backgroundColor:  ColorsPalette.white,
+                              label: context
+                                          .watch<GetWinchOffersProvider>()
+                                          .listRequests
+                                          .data
+                                          ?.acceptedOffer !=
+                                      null
+                                  ? LocaleKeys.call.tr()
+                                  : LocaleKeys.reject.tr(),
+                              backgroundColor: ColorsPalette.white,
                               labelColor: ColorsPalette.black,
                               // onPressed: (){context.watch<GetWinchOffersProvider>().listRequests.data?.acceptedOffer != null ?_callCustomer(context.watch<GetWinchOffersProvider>().listRequests.data?.acceptedOffer?.user?.phone??""):cancelOrder();
                               // },
                               onPressed: () {
-                                final provider = context.read<GetWinchOffersProvider>();
-                                if (provider.listRequests.data?.acceptedOffer != null) {
-                                  _callCustomer(provider.listRequests.data?.acceptedOffer?.user?.phone ?? "");
+                                final provider =
+                                    context.read<GetWinchOffersProvider>();
+                                if (provider.listRequests.data?.acceptedOffer !=
+                                    null) {
+                                  _callCustomer(provider.listRequests.data
+                                          ?.acceptedOffer?.user?.phone ??
+                                      "");
                                 } else {
                                   cancelOrder();
                                 }
@@ -628,7 +663,9 @@ class _MapRoutePageState extends State<MapRoutePage> {
                       ]),
                     );
                   }),
-                  SizedBox(height: 10,),
+                  SizedBox(
+                    height: 10,
+                  ),
                   SimplePrimaryButton(
                     label: LocaleKeys.OpeninGoogleMaps.tr(),
                     onPressed: openGoogleMapsDirections,
@@ -641,9 +678,11 @@ class _MapRoutePageState extends State<MapRoutePage> {
       ),
     );
   }
+
   void _callCustomer(String vendorNum) async {
     await launchUrlString("tel://$vendorNum");
   }
+
   void cancelOrder() async {
     try {
       // Get current location
@@ -652,7 +691,10 @@ class _MapRoutePageState extends State<MapRoutePage> {
 
       await MiscellaneousApi.rejectWinchOffer(
           locale: context.locale, orderId: widget.orderNum);
-      await MiscellaneousApi.getWinchOffers(locale: context.locale,lon:position.longitude ,lat: position.latitude);
+      await MiscellaneousApi.getWinchOffers(
+          locale: context.locale,
+          lon: position.longitude,
+          lat: position.latitude);
 
       setState(() {});
       showSnackbar(

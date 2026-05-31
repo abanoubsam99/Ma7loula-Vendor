@@ -83,7 +83,20 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationsHelper().handleLaunchNotification();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     ResponsiveHelper.init(context);

@@ -10,6 +10,7 @@ import 'package:easy_localization/easy_localization.dart' as e;
 import 'package:ma7lola_vendor/core/generated/locale_keys.g.dart';
 import 'package:ma7lola_vendor/core/utils/colors_palette.dart';
 import 'package:ma7lola_vendor/core/widgets/form_widgets/primary_button/simple_primary_button.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 import '../services/http/apis/miscellaneous_api.dart';
 
@@ -147,6 +148,7 @@ class NotificationData {
   final String type;
   final String offeredTotal;
   final String vendorId;
+  final String? customerPhone;
 
   const NotificationData({
     required this.eventType,
@@ -159,20 +161,35 @@ class NotificationData {
     required this.type,
     required this.offeredTotal,
     required this.vendorId,
+    this.customerPhone,
   });
 
+  static String _field(Map<String, dynamic> data, String key) {
+    final value = data[key];
+    if (value == null) return '';
+    final text = value.toString().trim();
+    return text == 'null' ? '' : text;
+  }
+
   factory NotificationData.fromMap(Map<String, dynamic> data) {
+    final orderId = _field(data, 'order_id');
+    final orderVendorId = _field(data, 'order_vendor_id');
     return NotificationData(
-      eventType: data['event_type'] ?? '',
-      actionRequiredFor: data['action_required_for'] ?? '',
-      kind: data['kind'] ?? '',
-      orderId: data['order_id'] ?? '',
-      status: data['status'] ?? '',
-      orderVendorStatus: data['order_vendor_status'] ?? '',
-      orderVendorId: data['order_vendor_id'] ?? '',
-      type: data['type'] ?? '',
-      offeredTotal: data['offered_total'] ?? '',
-      vendorId: data['vendor_id'] ?? '',
+      eventType: _field(data, 'event_type'),
+      actionRequiredFor: _field(data, 'action_required_for'),
+      kind: _field(data, 'kind'),
+      orderId: orderId.isNotEmpty ? orderId : orderVendorId,
+      status: _field(data, 'status'),
+      orderVendorStatus: _field(data, 'order_vendor_status'),
+      orderVendorId: orderVendorId.isNotEmpty ? orderVendorId : orderId,
+      type: _field(data, 'type'),
+      offeredTotal: _field(data, 'offered_total'),
+      vendorId: _field(data, 'vendor_id'),
+      customerPhone: _field(data, 'phone').isNotEmpty
+          ? _field(data, 'phone')
+          : (_field(data, 'customer_phone').isNotEmpty
+              ? _field(data, 'customer_phone')
+              : null),
     );
   }
 }
@@ -251,12 +268,61 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   int _remainingSeconds = 30;
   bool _isAccepting = false;
   bool _isRejecting = false;
+  bool _offerAccepted = false;
 
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
+  bool get _isWinchOrEmergency =>
+      _displayType == 'winch' || _displayType == 'emergency';
+
+  bool get _isCarPartsType =>
+      _displayType == 'tire' ||
+      _displayType == 'car-parts' ||
+      _displayType == 'battery';
+
+  /// مرحلة التسليم/الإنهاء بعد القبول (ونش وطوارئ)
+  bool get _showDeliverPhase {
+    if (!_isWinchOrEmergency) return false;
+    if (_offerAccepted) return true;
+    final vendorStatus =
+        widget.notificationData?.orderVendorStatus ?? '';
+    return vendorStatus == 'accepted' ||
+        vendorStatus == 'preparing' ||
+        vendorStatus == 'on_the_run' ||
+        _displayStatus == 'accepted' ||
+        _displayStatus == 'preparing' ||
+        _displayStatus == 'offer_pending' ||
+        _displayStatus == 'pending_customer';
+  }
+
+  int? _tryParseId(String? value) {
+    if (value == null || value.isEmpty || value == 'null') return null;
+    return int.tryParse(value);
+  }
+
+  /// معرف الطلب الصحيح حسب نوع الخدمة
+  int? get _apiOrderId {
+    final data = widget.notificationData;
+    if (_isWinchOrEmergency) {
+      return _tryParseId(data?.orderId) ??
+          _tryParseId(data?.orderVendorId) ??
+          _tryParseId(widget.orderId);
+    }
+    if (_isCarPartsType) {
+      return _tryParseId(data?.orderVendorId) ??
+          _tryParseId(data?.orderId) ??
+          _tryParseId(widget.orderId);
+    }
+    return _tryParseId(data?.orderVendorId) ??
+        _tryParseId(data?.orderId) ??
+        _tryParseId(widget.orderId);
+  }
+
   // Helpers to read data from either legacy fields or FCM payload
-  String get _displayOrderId =>
-      widget.notificationData?.orderId ?? widget.orderId ?? '-';
+  String get _displayOrderId {
+    final id = _apiOrderId;
+    return id?.toString() ?? '-';
+  }
 
   String get _displayType =>
       widget.notificationData?.type ?? '-';
@@ -368,6 +434,11 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   }
 
   Future<void> updatePriceOrder(num offered_total) async {
+    final orderId = _apiOrderId;
+    if (orderId == null) {
+      _showErrorSnackBar('رقم الطلب غير صالح');
+      return;
+    }
     try {
       setState(() {
         _isLoadingChangePrice = true;
@@ -375,15 +446,13 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
 
       await MiscellaneousApi.carPartsSubmitPriceOffer(
         locale: e.EasyLocalization.of(context)!.locale,
-        orderId: int.parse(_displayOrderId),
+        orderId: orderId,
         offered_total: offered_total,
       );
 
       if (mounted) {
-        _showSuccessSnackBar(LocaleKeys.done.tr());
-        setState(() {
-          _isLoadingChangePrice = false;
-        });
+        setState(() => _isLoadingChangePrice = false);
+        _closeAlertOnSuccess();
       }
     } catch (error) {
       if (mounted) {
@@ -397,71 +466,149 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
 
   Future<void> _handleAccept() async {
     if (_isAccepting || _isRejecting) return;
+    final orderId = _apiOrderId;
+    if (orderId == null) {
+      _showErrorSnackBar('رقم الطلب غير صالح');
+      return;
+    }
     setState(() => _isAccepting = true);
     HapticFeedback.mediumImpact();
+    final locale = e.EasyLocalization.of(context)!.locale;
     try {
-      if (_displayType == "tire" || _displayType == "car-parts" || _displayType == "battery") {
-         await MiscellaneousApi.updateCarPartsOrderStatus(locale: e.EasyLocalization.of(context)!.locale, orderId: int.parse(_displayOrderId));
-      } else if (_displayType == "winch") {
-         await MiscellaneousApi.updateOrderStatusWinch(locale: e.EasyLocalization.of(context)!.locale, orderId: int.parse(_displayOrderId));
-      } else if (_displayType == "emergency") {
-         await MiscellaneousApi.updateOrderStatusEmergency(locale: e.EasyLocalization.of(context)!.locale, orderId: int.parse(_displayOrderId));
-      } else {
-         if (widget.onAccept != null) {
-           await widget.onAccept!();
-         }
+      if (_isWinchOrEmergency) {
+        if (_showDeliverPhase) {
+          if (_displayType == 'winch') {
+            await MiscellaneousApi.updateOrderStatusWinch(
+              locale: locale,
+              orderId: orderId,
+            );
+          } else {
+            await MiscellaneousApi.updateOrderStatusEmergency(
+              locale: locale,
+              orderId: orderId,
+            );
+          }
+          if (mounted) {
+            setState(() => _isAccepting = false);
+            _closeAlertOnSuccess();
+          }
+        } else {
+          if (_displayType == 'winch') {
+            await MiscellaneousApi.sentWinchOffer(
+              locale: locale,
+              orderId: orderId,
+            );
+          } else {
+            await MiscellaneousApi.sentEmergencyOffer(
+              locale: locale,
+              orderId: orderId,
+            );
+          }
+          if (mounted) {
+            setState(() {
+              _isAccepting = false;
+              _offerAccepted = true;
+            });
+            _showSuccessSnackBar(LocaleKeys.done.tr());
+          }
+        }
+        return;
       }
-      _stopAlarmSound();
-      _countdownTimer.cancel();
+
+      if (_isCarPartsType) {
+        await MiscellaneousApi.updateCarPartsOrderStatus(
+          locale: locale,
+          orderId: orderId,
+        );
+      } else if (widget.onAccept != null) {
+        await widget.onAccept!();
+      }
       if (mounted) {
-        _showSuccessSnackBar(LocaleKeys.done.tr());
         setState(() => _isAccepting = false);
+        _closeAlertOnSuccess();
       }
     } catch (error) {
       if (mounted) {
         setState(() => _isAccepting = false);
-        _showErrorSnackBar(error.toString());
+        _showErrorSnackBar(_formatError(error));
       }
     }
   }
 
   Future<void> _handleReject() async {
     if (_isAccepting || _isRejecting) return;
+
+    if (_isWinchOrEmergency && _showDeliverPhase) {
+      final phone = widget.notificationData?.customerPhone;
+      if (phone != null && phone.isNotEmpty) {
+        await launchUrlString('tel://$phone');
+      }
+      return;
+    }
+
+    final orderId = _apiOrderId;
+    if (orderId == null) {
+      _showErrorSnackBar('رقم الطلب غير صالح');
+      return;
+    }
     setState(() => _isRejecting = true);
     HapticFeedback.mediumImpact();
+    final locale = e.EasyLocalization.of(context)!.locale;
     try {
-      if (_displayType == "tire" || _displayType == "car-parts" || _displayType == "battery") {
-        final locale = e.EasyLocalization.of(context)!.locale;
-        if (_displayType == "battery") {
-          await MiscellaneousApi.cancelBatteryOrder(id: int.parse(_displayOrderId), locale: locale);
-        } else if (_displayType == "tire") {
-          await MiscellaneousApi.cancelTiresOrder(id: int.parse(_displayOrderId), locale: locale);
+      if (_isCarPartsType) {
+        if (_displayType == 'battery') {
+          await MiscellaneousApi.cancelBatteryOrder(id: orderId, locale: locale);
+        } else if (_displayType == 'tire') {
+          await MiscellaneousApi.cancelTiresOrder(id: orderId, locale: locale);
         } else {
-          await MiscellaneousApi.cancelCarPartsOrder(id: int.parse(_displayOrderId), locale: locale);
+          await MiscellaneousApi.cancelCarPartsOrder(id: orderId, locale: locale);
         }
-      } else if (_displayType == "winch") {
-        final locale = e.EasyLocalization.of(context)!.locale;
-        await MiscellaneousApi.updateOrderStatusWinch(locale: locale, orderId: int.parse(_displayOrderId));
-      } else if (_displayType == "emergency") {
-        final locale = e.EasyLocalization.of(context)!.locale;
-        await MiscellaneousApi.updateOrderStatusEmergency(locale: locale, orderId: int.parse(_displayOrderId));
-      } else {
-        if (widget.onReject != null) {
-          await widget.onReject!();
-        }
+      } else if (_displayType == 'winch') {
+        await MiscellaneousApi.rejectWinchOffer(
+          locale: locale,
+          orderId: orderId,
+        );
+      } else if (_displayType == 'emergency') {
+        await MiscellaneousApi.rejectEmergencyOffer(
+          locale: locale,
+          orderId: orderId,
+        );
+      } else if (widget.onReject != null) {
+        await widget.onReject!();
       }
-      _stopAlarmSound();
-      _countdownTimer.cancel();
       if (mounted) {
-        _showSuccessSnackBar(LocaleKeys.done.tr());
         setState(() => _isRejecting = false);
+        _closeAlertOnSuccess();
       }
     } catch (error) {
       if (mounted) {
         setState(() => _isRejecting = false);
-        _showErrorSnackBar(error.toString());
+        _showErrorSnackBar(_formatError(error));
       }
     }
+  }
+
+  String _formatError(Object error) {
+    if (error is FormatException) {
+      return 'رقم الطلب غير صالح';
+    }
+    return error.toString();
+  }
+
+  String get _primaryActionLabel {
+    if (_isWinchOrEmergency) {
+      return _showDeliverPhase
+          ? LocaleKeys.delivered.tr()
+          : LocaleKeys.accept.tr();
+    }
+    return LocaleKeys.sub.tr();
+  }
+
+  String get _secondaryActionLabel {
+    if (_isWinchOrEmergency && _showDeliverPhase) {
+      return LocaleKeys.call.tr();
+    }
+    return LocaleKeys.cancel.tr();
   }
 
   void _showErrorSnackBar(String message) {
@@ -489,6 +636,13 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
         padding: const EdgeInsets.all(16),
       ),
     );
+  }
+
+  void _closeAlertOnSuccess() {
+    if (!mounted) return;
+    _stopAlarmSound();
+    _countdownTimer.cancel();
+    Navigator.of(context).pop();
   }
 
   void _showSuccessSnackBar(String message) {
@@ -1282,7 +1436,7 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
             Expanded(
               child: SimplePrimaryButton(
                 borderRadius: BorderRadius.circular(5),
-                label: LocaleKeys.sub.tr(),
+                label: _primaryActionLabel,
                 isLoading: _isAccepting,
                 onPressed: _isAccepting || _isRejecting ? null : _handleAccept,
               ),
@@ -1291,10 +1445,11 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
             Expanded(
               child: SimplePrimaryButton(
                 borderRadius: BorderRadius.circular(5),
-                label: LocaleKeys.cancel.tr(),
+                label: _secondaryActionLabel,
                 backgroundColor: ColorsPalette.white,
                 labelColor: ColorsPalette.customGrey,
-                isLoading: _isRejecting,
+                isLoading: _isRejecting &&
+                    !(_isWinchOrEmergency && _showDeliverPhase),
                 onPressed: _isAccepting || _isRejecting ? null : _handleReject,
               ),
             )
@@ -1303,21 +1458,34 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
         const SizedBox(height: 14),
 
         // Dismiss alert only (no action)
-        TextButton(
+        SimplePrimaryButton(
+          borderRadius: BorderRadius.circular(5),
+          label: 'إغلاق التنبيه فقط',
+          backgroundColor: ColorsPalette.red,
+          labelColor: ColorsPalette.white,
+          // isLoading: _isRejecting &&
+          //     !(_isWinchOrEmergency && _showDeliverPhase),
           onPressed: () {
             _stopAlarmSound();
             _countdownTimer.cancel();
             Navigator.of(context).pop();
           },
-          child: Text(
-            'إغلاق التنبيه فقط',
-            style: TextStyle(
-              fontSize: ResponsiveHelper.fontMedium,
-              color: AppTheme.getTextSecondary(_isDark),
-              decoration: TextDecoration.underline,
-            ),
-          ),
         ),
+        // TextButton(
+        //   onPressed: () {
+        //     _stopAlarmSound();
+        //     _countdownTimer.cancel();
+        //     Navigator.of(context).pop();
+        //   },
+        //   child: Text(
+        //     'إغلاق التنبيه فقط',
+        //     style: TextStyle(
+        //       fontSize: ResponsiveHelper.fontMedium,
+        //       color: AppTheme.getTextSecondary(_isDark),
+        //       decoration: TextDecoration.underline,
+        //     ),
+        //   ),
+        // ),
       ],
     );
   }

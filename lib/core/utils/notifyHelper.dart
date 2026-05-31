@@ -1,13 +1,11 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
-import 'package:ma7lola_vendor/view/screens/main_screen/tabs/winch/winch_order_details_screen.dart';
-
 import '../../firebase_options.dart';
-import '../../view/screens/main_screen/tabs/my_orders_tab/order_details_screen.dart';
 import '../widgets/order_alert_screen.dart';
 
 @pragma('vm:entry-point')
@@ -32,10 +30,20 @@ class NotificationsHelper {
   static const String orderChannelId = 'order_alerts_channel';
   static const String visitChannelId = 'visit_alerts_channel';
 
-  /// نمط اهتزاز قوي: انتظار → اهتزاز طويل × 4
-  static final Int64List _strongVibrationPattern =
-      Int64List.fromList([0, 800, 400, 800, 400, 800, 400, 1200]);
-  
+  /// معرف ثابت — كل إشعار جديد يستبدل السابق (إشعار واحد فقط في الشريط)
+  static const int _alertNotificationId = 9001;
+
+  /// نمط اهتزاز قوي ومكرر
+  static final Int64List _strongVibrationPattern = Int64List.fromList([
+    0, 1000, 300, 1000, 300, 1000, 300, 1000, 300, 1000, 300, 1500,
+  ]);
+
+  static Map<String, dynamic>? _pendingAlertData;
+  static String? _lastProcessedAlertKey;
+  static DateTime? _lastProcessedAt;
+  static bool _isAlertScreenOpen = false;
+  static String? _openAlertOrderKey;
+
   // Global Navigator Key للوصول للـ context من أي مكان
   static GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -49,6 +57,14 @@ class NotificationsHelper {
 
     // Get FCM token (optional, if you want to store or use it)
     await _getFCMToken();
+  }
+
+  /// يُستدعى بعد أول إطار عندما يكون الـ Navigator جاهزاً
+  Future<void> handleLaunchNotification() async {
+    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      _handleNotificationOpenedApp(initialMessage);
+    }
   }
 
   /// Initialize Firebase
@@ -190,39 +206,46 @@ class NotificationsHelper {
   /// Handle when notification is opened from background
   void _handleNotificationOpenedApp(RemoteMessage message) {
     print("📱 فتح التطبيق من الإشعار: ${message.data}");
-    
-    final context = navigatorKey.currentContext;
-    if (context == null) return;
+    if (!_isActionableAlert(message.data)) return;
+    _pendingAlertData = Map<String, dynamic>.from(message.data);
+    _openAlertFromData(message.data);
+  }
 
-    // الحصول على النوع من الـ data أو من محتوى الإشعار
-    final status = message.data['status']?.toString() ;
-    // final status = message.data['status']?.toString() ??
-    //              (message.notification != null ? _getNotificationType(message.notification!) : '');
+  static bool _isActionableAlert(Map<String, dynamic> data) {
+    if (data.isEmpty) return false;
+    final status = data['status']?.toString();
+    return status == 'new' ||
+        status == 'pending_customer' ||
+        status == 'offer_pending';
+  }
 
-    if (status!=null && (status == 'new'||status == 'pending_customer'||status == 'offer_pending')) {
-      // final orderId = message.data['order_vendor_id']?.toString() ?? (message.notification != null ? _extractOrderId(message.notification!.title) : '');
-      // final orderModel = _findOrderModel(orderId);
-      //
-      if (message.data!=null && message.data['order_vendor_id'] != null) {
-        if((message.data['type']=="car-parts"||message.data['type']=="tire"||message.data['type']=="battery")){
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => OrderDetails(orderNum: int.parse(message.data['order_vendor_id']??0.0),orderType: 0,),
-            ),
-          );
-        }else if (message.data['type']=="winch"){
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => WinchOrderDetails(orderNum: int.parse(message.data['order_vendor_id']??0.0),userNum: int.parse(message.data['id']??0.0).toString(),vendorName: "#${int.parse(message.data['id']??0.0).toString()}",),
-            ),
-          );
-        }
-        showFullScreenOrderAlert(message.data!);
-      } else if (message.data != null && message.data["status"] != null) {
-        // Backup
-        showFullScreenOrderAlert(message.data!);
-      }
+  static String _alertDedupeKey(Map<String, dynamic> data) {
+    final orderId = data['order_vendor_id']?.toString() ?? '';
+    final status = data['status']?.toString() ?? '';
+    final eventType = data['event_type']?.toString() ?? '';
+    return '$orderId|$status|$eventType';
+  }
+
+  bool _shouldProcessAlert(Map<String, dynamic> data) {
+    if (!_isActionableAlert(data)) return false;
+    final key = _alertDedupeKey(data);
+    final now = DateTime.now();
+    if (_lastProcessedAlertKey == key &&
+        _lastProcessedAt != null &&
+        now.difference(_lastProcessedAt!) < const Duration(seconds: 5)) {
+      return false;
     }
+    _lastProcessedAlertKey = key;
+    _lastProcessedAt = now;
+    return true;
+  }
+
+  void _openAlertFromData(Map<String, dynamic> data) {
+    if (!_isActionableAlert(data)) return;
+    _pendingAlertData = Map<String, dynamic>.from(data);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showFullScreenOrderAlert(data);
+    });
   }
 
   /// Handle incoming FCM notifications when the app is in the foreground
@@ -235,6 +258,8 @@ class NotificationsHelper {
     RemoteMessage message, {
     bool showFullScreen = false,
   }) async {
+    if (message.data.isEmpty || !_shouldProcessAlert(message.data)) return;
+
     final title = message.notification?.title ??
         message.data['title']?.toString() ??
         'طلب توصيل جديد 🚨';
@@ -243,10 +268,29 @@ class NotificationsHelper {
         'لديك إشعار جديد يحتاج انتباهك';
     final type = _resolveNotificationType(message.data, title, body);
 
-    await _showHighPriorityNotification(title, body, type);
+    _pendingAlertData = Map<String, dynamic>.from(message.data);
 
-    if (showFullScreen && message.data.isNotEmpty) {
-      showFullScreenOrderAlert(message.data);
+    final hasContext = navigatorKey.currentContext != null;
+
+    // التطبيق مفتوح: افتح صفحة التنبيه مباشرة (صوت واهتزاز من الشاشة نفسها)
+    if (showFullScreen && hasContext) {
+      _openAlertFromData(message.data);
+      return;
+    }
+
+    // الخلفية: إشعار واحد فقط — لا نكرر إذا FCM عرض الإشعار بالفعل
+    final fcmAlreadyDisplayed = message.notification != null;
+    if (!fcmAlreadyDisplayed) {
+      await _showHighPriorityNotification(
+        title,
+        body,
+        type,
+        alertData: message.data,
+      );
+    }
+
+    if (hasContext) {
+      _openAlertFromData(message.data);
     }
   }
 
@@ -289,46 +333,42 @@ class NotificationsHelper {
   // }
 
   /// عرض Full Screen Alert للطلب الجديد
- static void showFullScreenOrderAlert(Map<String, dynamic> data) {
+  static void showFullScreenOrderAlert(Map<String, dynamic> data) {
     final context = navigatorKey.currentContext;
-    if (context != null) {
-      // استخراج order_vendor_id من الإشعار
-      // final orderId = _extractOrderId(data.title);
-      
-      // // محاولة إيجاد OrderModel من القائمة
-      // OrderModel? orderModel = _findOrderModel(orderId);
-      //
-      if(data!=null)
-      // فتح شاشة Full Screen Alert
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => OrderAlertScreen(
-            notificationData: NotificationData(
-                eventType: '${data["event_type"].toString()}',
-                actionRequiredFor: '${data["action_required_for"].toString()}',
-                kind: '${data["kind"].toString()}',
-                orderId: '${data["order_vendor_id"].toString()}',
-                status: '${data["status"].toString()}',
-                orderVendorStatus: '${data["order_vendor_status"].toString()}',
-                orderVendorId: '${data["order_vendor_id"].toString()}',
-                type: '${data["type"].toString()}',
-                offeredTotal: '${data["offered_total"].toString()}',
-                vendorId: '${data["vendor_id"].toString()}'
-            ),
-            orderId: "${data["order_vendor_id"].toString()}",
-            orderReference: data["title"] ?? 'N/A',
-            customerName: extractCustomerName(data["body"]),
-            location: extractLocation(data["body"]),
-            orderDetails: data["body"],
-            // orderModel: orderModel, // تمرير OrderModel إذا وُجد
-          ),
-          fullscreenDialog: true,
+    if (context == null) return;
+    if (!_isActionableAlert(data)) return;
+
+    final orderKey = _alertDedupeKey(data);
+    if (_isAlertScreenOpen && _openAlertOrderKey == orderKey) return;
+
+    _isAlertScreenOpen = true;
+    _openAlertOrderKey = orderKey;
+
+    final notificationData = NotificationData.fromMap(data);
+    final legacyOrderId = notificationData.orderId.isNotEmpty
+        ? notificationData.orderId
+        : notificationData.orderVendorId;
+
+    Navigator.of(context)
+        .push(
+      MaterialPageRoute(
+        builder: (context) => OrderAlertScreen(
+          notificationData: notificationData,
+          notificationTitle: data['title']?.toString(),
+          notificationBody: data['body']?.toString(),
+          orderId: legacyOrderId,
+          orderReference: data['title']?.toString() ?? 'N/A',
+          customerName: extractCustomerName(data['body']?.toString()),
+          location: extractLocation(data['body']?.toString()),
+          orderDetails: data['body']?.toString(),
         ),
-      );
-    }
-    
-    // عرض notification عادي كـ backup
-    // _showHighPriorityNotification("${data["title"]}", "${data["body"]}", 'order');
+        fullscreenDialog: true,
+      ),
+    )
+        .then((_) {
+      _isAlertScreenOpen = false;
+      _openAlertOrderKey = null;
+    });
   }
 
   /// عرض Full Screen Alert للزيارة
@@ -446,8 +486,30 @@ class NotificationsHelper {
     return dateMatch?.group(0) ?? 'غير محدد';
   }
 
+  String _encodeNotificationPayload(String type, Map<String, dynamic> data) {
+    return jsonEncode({'type': type, 'data': data});
+  }
+
+  Map<String, dynamic>? _decodeNotificationPayload(String? payload) {
+    if (payload == null || payload.isEmpty) return _pendingAlertData;
+    try {
+      final decoded = jsonDecode(payload) as Map<String, dynamic>;
+      final data = decoded['data'];
+      if (data is Map) {
+        return Map<String, dynamic>.from(data);
+      }
+    } catch (_) {}
+    return _pendingAlertData;
+  }
+
   /// عرض إشعار ذو أولوية عالية — يظهر من فوق الشاشة مع صوت واهتزاز قوي
-  Future<void> _showHighPriorityNotification(String? title, String? body, String type) async {
+  Future<void> _showHighPriorityNotification(
+    String? title,
+    String? body,
+    String type, {
+    Map<String, dynamic>? alertData,
+  }) async {
+    await flutterLocalNotificationsPlugin.cancel(_alertNotificationId);
     final isVisit = type == 'visit';
     final channelId = isVisit ? visitChannelId : orderChannelId;
     final channelName = isVisit ? 'مواعيد الزيارات' : 'طلبات التوصيل';
@@ -470,8 +532,11 @@ class NotificationsHelper {
       ticker: isVisit ? 'موعد زيارة قريب 🚨' : 'طلب توصيل جديد 🚨',
       autoCancel: true,
       ongoing: false,
+      onlyAlertOnce: false,
       channelAction: AndroidNotificationChannelAction.createIfNotExists,
-      additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT — يكرر الصوت لحد ما اليوزر يشوفه
+      additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT — يكرر الصوت
+      ledOnMs: 1000,
+      ledOffMs: 500,
       styleInformation: BigTextStyleInformation(
         body ?? '',
         contentTitle: title,
@@ -493,54 +558,23 @@ class NotificationsHelper {
       iOS: iOSDetails,
     );
 
+    final data = alertData ?? _pendingAlertData ?? {};
+    final payload = _encodeNotificationPayload(type, data);
+
     await flutterLocalNotificationsPlugin.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      _alertNotificationId,
       title ?? (isVisit ? "موعد زيارة قريب 🚨" : "طلب توصيل جديد 🚨"),
       body ?? (isVisit ? "لديك زيارة محددة تحتاج موافقتك" : "لديك طلب جديد يحتاج موافقتك"),
       platformDetails,
-      payload: type == 'visit' ? 'visit|$title' : 'order|$title',
+      payload: payload,
     );
   }
 
-  /// معالجة النقر على الإشعار
+  /// معالجة النقر على الإشعار — فتح صفحة التنبيه
   void _onNotificationTapped(NotificationResponse response) {
-    final payload = response.payload ?? '';
-    final parts = payload.split('|');
-    final type = parts.first;
-    final title = parts.length > 1 ? parts[1] : '';
-
-    final context = navigatorKey.currentContext;
-    if (context == null) return;
-
-    if (type == 'order' || type == 'order_alert') {
-      print('📱 تم النقر على إشعار الطلب');
-      final orderId = _extractOrderId(title);
-      // final orderModel = _findOrderModel(orderId);
-      //
-      // if (orderModel != null) {
-      //   Navigator.of(context).push(
-      //     MaterialPageRoute(
-      //       builder: (context) => OrderDetailsScreen(orderModel: orderModel),
-      //     ),
-      //   );
-      // } else {
-      //   print('⚠️ لم يتم العثور على تفاصيل الطلب');
-      // }
-    } else if (type == 'visit' || type == 'visit_alert') {
-      print('📱 تم النقر على إشعار الزيارة');
-      final visitId = _extractVisitId(title);
-      // final visitData = _findVisitData(visitId);
-      //
-      // if (visitData != null) {
-      //   Navigator.of(context).push(
-      //     MaterialPageRoute(
-      //       builder: (context) => VisitDetails(visitDetailsData: visitData),
-      //     ),
-      //   );
-      // } else {
-      //   print('⚠️ لم يتم العثور على تفاصيل الزيارة');
-      // }
-    }
+    final alertData = _decodeNotificationPayload(response.payload);
+    if (alertData == null || alertData.isEmpty) return;
+    _openAlertFromData(alertData);
   }
 
   // /// Background message handler (to handle notifications when the app is in the background)
