@@ -52,68 +52,68 @@ class AppTheme {
       isDark ? darkTextSecondary : lightTextSecondary;
 
   static LinearGradient get primaryGradient => const LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [primary, primaryLight],
-  );
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [primary, primaryLight],
+      );
 
   static LinearGradient get secondaryGradient => const LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [secondary, Color(0xFF00E6A0)],
-  );
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [secondary, Color(0xFF00E6A0)],
+      );
 
   static LinearGradient get accentGradient => const LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [accent, Color(0xFFFFD93D)],
-  );
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [accent, Color(0xFFFFD93D)],
+      );
 
   static LinearGradient get cyanGradient => const LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [cyan, Color(0xFF06B6D4)],
-  );
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [cyan, Color(0xFF06B6D4)],
+      );
 
   static LinearGradient get errorGradient => const LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [error, Color(0xFFFF8A8A)],
-  );
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [error, Color(0xFFFF8A8A)],
+      );
 
   static LinearGradient alertBackgroundGradient(bool isDark) => LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: isDark
-        ? [
-      const Color(0xFF1A1040),
-      const Color(0xFF0D0D1A),
-      darkBackground,
-    ]
-        : [
-      primary.withOpacity(0.15),
-      lightBackground,
-      white,
-    ],
-  );
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: isDark
+            ? [
+                const Color(0xFF1A1040),
+                const Color(0xFF0D0D1A),
+                darkBackground,
+              ]
+            : [
+                primary.withOpacity(0.15),
+                lightBackground,
+                white,
+              ],
+      );
 
   static List<BoxShadow> softShadow(bool isDark) => [
-    BoxShadow(
-      color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
-      blurRadius: 20,
-      offset: const Offset(0, 8),
-      spreadRadius: -4,
-    ),
-  ];
+        BoxShadow(
+          color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+          blurRadius: 20,
+          offset: const Offset(0, 8),
+          spreadRadius: -4,
+        ),
+      ];
 
   static List<BoxShadow> glowShadow(Color color, bool isDark) => [
-    BoxShadow(
-      color: color.withOpacity(isDark ? 0.4 : 0.3),
-      blurRadius: 20,
-      offset: const Offset(0, 8),
-      spreadRadius: -4,
-    ),
-  ];
+        BoxShadow(
+          color: color.withOpacity(isDark ? 0.4 : 0.3),
+          blurRadius: 20,
+          offset: const Offset(0, 8),
+          spreadRadius: -4,
+        ),
+      ];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -269,6 +269,7 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   bool _isAccepting = false;
   bool _isRejecting = false;
   bool _offerAccepted = false;
+  bool _isClosing = false;
 
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
@@ -284,8 +285,7 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   bool get _showDeliverPhase {
     if (!_isWinchOrEmergency) return false;
     if (_offerAccepted) return true;
-    final vendorStatus =
-        widget.notificationData?.orderVendorStatus ?? '';
+    final vendorStatus = widget.notificationData?.orderVendorStatus ?? '';
     return vendorStatus == 'accepted' ||
         vendorStatus == 'preparing' ||
         vendorStatus == 'on_the_run' ||
@@ -324,11 +324,9 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
     return id?.toString() ?? '-';
   }
 
-  String get _displayType =>
-      widget.notificationData?.type ?? '-';
+  String get _displayType => widget.notificationData?.type ?? '-';
 
-  String get _displayEventType =>
-      widget.notificationData?.eventType ?? '-';
+  String get _displayEventType => widget.notificationData?.eventType ?? '-';
 
   String get _displayStatus => widget.notificationData?.status ?? '-';
 
@@ -340,17 +338,16 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
 
   String get _displayOfferedTotal =>
       widget.notificationData?.offeredTotal != null &&
-          widget.notificationData!.offeredTotal.isNotEmpty
+              widget.notificationData!.offeredTotal.isNotEmpty
           ? '${widget.notificationData!.offeredTotal} EGP '
           : '-';
 
-  String get _displayTitle =>
-      widget.notificationTitle ?? '🚨 طلب توصيل جديد!';
+  String get _displayTitle => widget.notificationTitle ?? '🚨 طلب توصيل جديد!';
 
   String get _displayBody =>
       widget.notificationBody ??
-          widget.orderDetails ??
-          'لديك طلب جديد يحتاج منك الموافقة';
+      widget.orderDetails ??
+      'لديك طلب جديد يحتاج منك الموافقة';
 
   @override
   void initState() {
@@ -557,11 +554,13 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
     try {
       if (_isCarPartsType) {
         if (_displayType == 'battery') {
-          await MiscellaneousApi.cancelBatteryOrder(id: orderId, locale: locale);
+          await MiscellaneousApi.cancelBatteryOrder(
+              id: orderId, locale: locale);
         } else if (_displayType == 'tire') {
           await MiscellaneousApi.cancelTiresOrder(id: orderId, locale: locale);
         } else {
-          await MiscellaneousApi.cancelCarPartsOrder(id: orderId, locale: locale);
+          await MiscellaneousApi.cancelCarPartsOrder(
+              id: orderId, locale: locale);
         }
       } else if (_displayType == 'winch') {
         await MiscellaneousApi.rejectWinchOffer(
@@ -639,10 +638,32 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   }
 
   void _closeAlertOnSuccess() {
+    _closeAlert();
+  }
+
+  void _closeAlert() {
+    if (_isClosing) return;
+    _isClosing = true;
+
+    try {
+      if (_countdownTimer.isActive) {
+        _countdownTimer.cancel();
+      }
+    } catch (_) {}
+
+    try {
+      _stopAlarmSound();
+    } catch (_) {}
+
     if (!mounted) return;
-    _stopAlarmSound();
-    _countdownTimer.cancel();
-    Navigator.of(context).pop();
+    if (!Navigator.canPop(context)) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+    });
   }
 
   void _showSuccessSnackBar(String message) {
@@ -657,8 +678,8 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
                 color: AppTheme.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.check_circle_rounded,
-                  color: AppTheme.white),
+              child:
+                  const Icon(Icons.check_circle_rounded, color: AppTheme.white),
             ),
             const SizedBox(width: 12),
             Expanded(child: Text(message)),
@@ -721,14 +742,21 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
                         children: [
                           _buildHeader(),
                           const SizedBox(height: 32),
-                          _buildNotificationInfo(),   // ✅ NEW FCM data section
+                          _buildNotificationInfo(), // ✅ NEW FCM data section
                           const SizedBox(height: 24),
                           _buildCountdownTimer(),
                           const SizedBox(height: 32),
-                          if((_displayType=="tire"||_displayType=="car-parts"||_displayType=="battery") && _displayStatus == "new")
+                          if ((_displayType == "tire" ||
+                                  _displayType == "car-parts" ||
+                                  _displayType == "battery") &&
+                              _displayStatus == "new")
                             _buildChangePriceSection(),
-                          if(_displayType=="tire"||_displayType=="car-parts"||_displayType=="battery"||_displayType=="winch"||_displayType=="emergency")
-                            _buildActionButtons(),       // ✅ Accept / Reject
+                          if (_displayType == "tire" ||
+                              _displayType == "car-parts" ||
+                              _displayType == "battery" ||
+                              _displayType == "winch" ||
+                              _displayType == "emergency")
+                            _buildActionButtons(), // ✅ Accept / Reject
                           const SizedBox(height: 20),
                         ],
                       ),
@@ -802,7 +830,8 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
           child: AnimatedBuilder(
             animation: _floatAnimation,
             builder: (context, child) => Transform.translate(
-              offset: Offset(_floatAnimation.value, _floatAnimation.value * 0.5),
+              offset:
+                  Offset(_floatAnimation.value, _floatAnimation.value * 0.5),
               child: Container(
                 width: size.width * 0.3,
                 height: size.width * 0.3,
@@ -839,7 +868,8 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
                 : (index % 3 == 1 ? AppTheme.primary : AppTheme.secondary);
             return Positioned(
               left: x,
-              top: y + (_floatAnimation.value * (index.isEven ? 1 : -1) * delay),
+              top:
+                  y + (_floatAnimation.value * (index.isEven ? 1 : -1) * delay),
               child: Container(
                 width: particleSize,
                 height: particleSize,
@@ -933,7 +963,8 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
                     gradient: AppTheme.primaryGradient,
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.primary.withOpacity(_isDark ? 0.5 : 0.4),
+                        color:
+                            AppTheme.primary.withOpacity(_isDark ? 0.5 : 0.4),
                         blurRadius: 30,
                         spreadRadius: 5,
                       ),
@@ -1130,8 +1161,7 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(Icons.attach_money_rounded,
-                color: AppTheme.secondary,
-                size: ResponsiveHelper.iconLarge),
+                color: AppTheme.secondary, size: ResponsiveHelper.iconLarge),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -1256,12 +1286,12 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
         ),
         boxShadow: isUrgent
             ? [
-          BoxShadow(
-            color: AppTheme.error.withOpacity(_isDark ? 0.3 : 0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ]
+                BoxShadow(
+                  color: AppTheme.error.withOpacity(_isDark ? 0.3 : 0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ]
             : AppTheme.softShadow(_isDark),
       ),
       child: Column(
@@ -1358,8 +1388,7 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.warning_rounded,
-                      color: AppTheme.error,
-                      size: ResponsiveHelper.iconSmall),
+                      color: AppTheme.error, size: ResponsiveHelper.iconSmall),
                   const SizedBox(width: 8),
                   Text(
                     'الوقت على وشك الانتهاء!',
@@ -1388,14 +1417,16 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
             borderRadius: BorderRadius.circular(5),
             label: "Change Price".tr(),
             isLoading: _isLoadingChangePrice,
-            onPressed: _isLoadingChangePrice ? null : () {
-              final value = num.tryParse(_priceController.text);
-              if (value == null) {
-                _showErrorSnackBar("Invalid price");
-                return;
-              }
-              updatePriceOrder(value);
-            },
+            onPressed: _isLoadingChangePrice
+                ? null
+                : () {
+                    final value = num.tryParse(_priceController.text);
+                    if (value == null) {
+                      _showErrorSnackBar("Invalid price");
+                      return;
+                    }
+                    updatePriceOrder(value);
+                  },
           ),
         ),
         const SizedBox(width: 8),
@@ -1431,30 +1462,28 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   Widget _buildActionButtons() {
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: SimplePrimaryButton(
-                borderRadius: BorderRadius.circular(5),
-                label: _primaryActionLabel,
-                isLoading: _isAccepting,
-                onPressed: _isAccepting || _isRejecting ? null : _handleAccept,
-              ),
+        Row(children: [
+          Expanded(
+            child: SimplePrimaryButton(
+              borderRadius: BorderRadius.circular(5),
+              label: _primaryActionLabel,
+              isLoading: _isAccepting,
+              onPressed: _isAccepting || _isRejecting ? null : _handleAccept,
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: SimplePrimaryButton(
-                borderRadius: BorderRadius.circular(5),
-                label: _secondaryActionLabel,
-                backgroundColor: ColorsPalette.white,
-                labelColor: ColorsPalette.customGrey,
-                isLoading: _isRejecting &&
-                    !(_isWinchOrEmergency && _showDeliverPhase),
-                onPressed: _isAccepting || _isRejecting ? null : _handleReject,
-              ),
-            )
-          ]
-        ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SimplePrimaryButton(
+              borderRadius: BorderRadius.circular(5),
+              label: _secondaryActionLabel,
+              backgroundColor: ColorsPalette.white,
+              labelColor: ColorsPalette.customGrey,
+              isLoading:
+                  _isRejecting && !(_isWinchOrEmergency && _showDeliverPhase),
+              onPressed: _isAccepting || _isRejecting ? null : _handleReject,
+            ),
+          )
+        ]),
         const SizedBox(height: 14),
 
         // Dismiss alert only (no action)
@@ -1465,11 +1494,7 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
           labelColor: ColorsPalette.white,
           // isLoading: _isRejecting &&
           //     !(_isWinchOrEmergency && _showDeliverPhase),
-          onPressed: () {
-            _stopAlarmSound();
-            _countdownTimer.cancel();
-            Navigator.of(context).pop();
-          },
+          onPressed: _isClosing ? null : _closeAlert,
         ),
         // TextButton(
         //   onPressed: () {
@@ -1489,7 +1514,6 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
       ],
     );
   }
-
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1506,7 +1530,8 @@ class _LinesPainter extends CustomPainter {
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
     for (double i = -size.height; i < size.width + size.height; i += 50) {
-      canvas.drawLine(Offset(i, 0), Offset(i + size.height, size.height), paint);
+      canvas.drawLine(
+          Offset(i, 0), Offset(i + size.height, size.height), paint);
     }
   }
 
@@ -1567,16 +1592,16 @@ class _ActionButtonState extends State<_ActionButton>
     return GestureDetector(
       onTapDown: widget.onPressed != null
           ? (_) {
-        _controller.forward();
-        setState(() => _isPressed = true);
-      }
+              _controller.forward();
+              setState(() => _isPressed = true);
+            }
           : null,
       onTapUp: widget.onPressed != null
           ? (_) {
-        _controller.reverse();
-        setState(() => _isPressed = false);
-        widget.onPressed!();
-      }
+              _controller.reverse();
+              setState(() => _isPressed = false);
+              widget.onPressed!();
+            }
           : null,
       onTapCancel: () {
         _controller.reverse();
@@ -1591,50 +1616,49 @@ class _ActionButtonState extends State<_ActionButton>
             gradient: widget.onPressed != null
                 ? widget.gradient
                 : LinearGradient(colors: [
-              Colors.grey.withOpacity(0.3),
-              Colors.grey.withOpacity(0.2),
-            ]),
+                    Colors.grey.withOpacity(0.3),
+                    Colors.grey.withOpacity(0.2),
+                  ]),
             borderRadius: BorderRadius.circular(20),
             boxShadow: widget.onPressed != null
                 ? [
-              BoxShadow(
-                color: widget.gradient.colors.first
-                    .withOpacity(_isPressed ? 0.3 : 0.5),
-                blurRadius: _isPressed ? 15 : 25,
-                offset: Offset(0, _isPressed ? 5 : 10),
-              ),
-            ]
+                    BoxShadow(
+                      color: widget.gradient.colors.first
+                          .withOpacity(_isPressed ? 0.3 : 0.5),
+                      blurRadius: _isPressed ? 15 : 25,
+                      offset: Offset(0, _isPressed ? 5 : 10),
+                    ),
+                  ]
                 : [],
           ),
           child: widget.isLoading
               ? const Center(
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                valueColor:
-                AlwaysStoppedAnimation(AppTheme.white),
-              ),
-            ),
-          )
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation(AppTheme.white),
+                    ),
+                  ),
+                )
               : Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(widget.icon,
-                  color: AppTheme.white,
-                  size: ResponsiveHelper.iconLarge),
-              const SizedBox(width: 10),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  fontSize: ResponsiveHelper.fontHeadingSmall,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.white,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(widget.icon,
+                        color: AppTheme.white,
+                        size: ResponsiveHelper.iconLarge),
+                    const SizedBox(width: 10),
+                    Text(
+                      widget.label,
+                      style: TextStyle(
+                        fontSize: ResponsiveHelper.fontHeadingSmall,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.white,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );
