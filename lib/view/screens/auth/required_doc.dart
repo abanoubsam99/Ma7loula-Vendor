@@ -46,9 +46,9 @@ class _RequiredDocState extends State<RequiredDoc> {
   }
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        body: Container(
+    return Scaffold(
+      body: SafeArea(
+        child: Container(
           height: MediaQuery.of(context).size.height,
           decoration: BoxDecoration(
             color: ColorsPalette.lighttGrey,

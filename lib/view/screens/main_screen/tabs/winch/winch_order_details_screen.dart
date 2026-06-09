@@ -412,30 +412,42 @@ class _WinchOrderDetailsState extends State<WinchOrderDetails> {
   }
 
   void _acceptOrder() async {
+    if (_isLoadingAccept) return;
+    
+    setState(() {
+      _isLoadingAccept = true;
+    });
+    
     try {
-      setState(() {
-        _isLoadingAccept = true;
-      });
       await MiscellaneousApi.updateOrderStatusWinch(
         locale: context.locale,
         orderId: widget.orderNum,
       );
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) {
-        return WinchOrderDetails(
-          orderNum: widget.orderNum,
-          userNum: widget.userNum,
-          vendorName: widget.vendorName,
-        );
-      }));
+      
+      if (!mounted) return;
+      
+      // استخدام setState لإعادة بناء الصفحة الحالية بدلاً من pushReplacement
+      setState(() {
+        _isLoadingAccept = false;
+      });
+      
+      // إعادة تحميل البيانات من خلال إعادة بناء الـ FutureBuilder
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      if (!mounted) return;
+      
       showSnackbar(
         context: context,
         status: SnackbarStatus.success,
         message: LocaleKeys.done.tr(),
       );
     } catch (e) {
+      if (!mounted) return;
+      
       setState(() {
         _isLoadingAccept = false;
       });
+      
       showSnackbar(
         context: context,
         status: SnackbarStatus.error,
@@ -445,10 +457,13 @@ class _WinchOrderDetailsState extends State<WinchOrderDetails> {
   }
 
   void _cancelOrder() async {
+    if (_isLoadingCancel) return;
+    
+    setState(() {
+      _isLoadingCancel = true;
+    });
+    
     try {
-      setState(() {
-        _isLoadingCancel = true;
-      });
       // For winch orders, we may need to check if there's a specific cancel method
       // For now, we'll use updateOrderStatusWinch with a cancel status
       // You may need to adjust this based on your API requirements
@@ -456,25 +471,31 @@ class _WinchOrderDetailsState extends State<WinchOrderDetails> {
         locale: context.locale,
         orderId: widget.orderNum,
       );
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) {
-        return WinchOrderDetails(
-          orderNum: widget.orderNum,
-          userNum: widget.userNum,
-          vendorName: widget.vendorName,
-        );
-      }));
+      
+      if (!mounted) return;
+      
+      // استخدام setState لإعادة بناء الصفحة الحالية بدلاً من pushReplacement
       setState(() {
         _isLoadingCancel = false;
       });
+      
+      // إعادة تحميل البيانات من خلال إعادة بناء الـ FutureBuilder
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      if (!mounted) return;
+      
       showSnackbar(
         context: context,
         status: SnackbarStatus.success,
         message: LocaleKeys.done.tr(),
       );
     } catch (e) {
+      if (!mounted) return;
+      
       setState(() {
         _isLoadingCancel = false;
       });
+      
       showSnackbar(
         context: context,
         status: SnackbarStatus.error,

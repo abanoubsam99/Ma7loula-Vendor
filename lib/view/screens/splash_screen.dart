@@ -21,77 +21,85 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  late final Future<void> _splashFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _splashFuture = _splashOperation();
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
-        future: _splashOperation(context),
-        builder: (context, snapshot) {
-          return Container(
-            //color: ColorsPalette.white,
-            decoration: const BoxDecoration(
-              // color: ColorsPalette.primaryColor,
-              image: DecorationImage(
-                fit: BoxFit.fill,
-                colorFilter: ColorFilter.mode(
-                    ColorsPalette.primaryColor, BlendMode.overlay),
-                image: AssetImage(AssetsManager.splash),
+      future: _splashFuture,
+      builder: (context, snapshot) {
+        return Container(
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              fit: BoxFit.fill,
+              colorFilter: ColorFilter.mode(
+                ColorsPalette.primaryColor,
+                BlendMode.overlay,
               ),
+              image: AssetImage(AssetsManager.splash),
             ),
-            alignment: Alignment.center,
-            child: AppLogo(
-              size: 400,
-            ),
-          );
-        });
+          ),
+          alignment: Alignment.center,
+          child: const AppLogo(
+            size: 400,
+          ),
+        );
+      },
+    );
   }
 
-  Future<void> _splashOperation(BuildContext context) async {
+  Future<void> _splashOperation() async {
     try {
       await Future.delayed(const Duration(seconds: 2));
 
-      // // Force clear the token to resolve 401 error
-      // await SecureStorageService.instance.writeString(
-      //   key: SecureStorageKeys.token,
-      //   value: '',
-      // );
-      
-      print('DEBUG - Cleared token to force re-login');
-
       final storedToken = await SecureStorageService.instance
           .readString(key: SecureStorageKeys.token);
-          
-      // Since we cleared the token, this should go to the login screen
-      if (![storedToken].contains(null)) {
+
+      if (!mounted) return;
+
+      if (storedToken != null) {
         final userProvider = context.read<UserProvider>();
-          
         try {
-          // This will fail since we cleared the token, forcing login screen
           await userProvider.autoLogin(locale: context.locale);
+          if (!mounted) return;
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-                builder: (context) => MainScreen(
-                      index: 0,
-                    )),
+              builder: (context) => MainScreen(
+                index: 0,
+              ),
+            ),
           );
         } catch (error) {
-          // Auto login failed, go to login screen
+          if (!mounted) return;
           Navigator.pushReplacement(
-            context, 
-            MaterialPageRoute(builder: (context) => LoginScreen(
-              fromCart: false,
-              carID: 0,
-              products: [],
-              batteries: [],
-              fromCartBatteries: false,
-              tires: [],
-              fromCartTires: false,
-              car: null,
-            )));
+            context,
+            MaterialPageRoute(
+              builder: (context) => LoginScreen(
+                fromCart: false,
+                carID: 0,
+                products: [],
+                batteries: [],
+                fromCartBatteries: false,
+                tires: [],
+                fromCartTires: false,
+                car: null,
+              ),
+            ),
+          );
         }
       } else {
+        if (!mounted) return;
         Navigator.of(context).pushReplacementNamed(LanguagesScreen.routeName);
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignore splash errors; keep showing splash until user restarts.
+    }
   }
 }

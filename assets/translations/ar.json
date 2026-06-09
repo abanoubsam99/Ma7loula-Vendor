@@ -456,5 +456,6 @@
   "offer_pending": "العرض قيد الانتظار",
   "new": "جديد",
   "completed": "مكتمل",
-  "Enter new price": "أدخل السعر الجديد"
+  "Enter new price": "أدخل السعر الجديد",
+  "description": "وصف العطل"
 }

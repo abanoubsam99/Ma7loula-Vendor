@@ -1,7 +1,12 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:ma7lola_vendor/model/emergency/update_emergency_service.dart';
+import 'package:ma7lola_vendor/model/emergency/emergency_offers_model.dart'
+    as offers;
+import 'package:ma7lola_vendor/model/emergency/update_emergency_service.dart'
+    as update;
+import 'package:ma7lola_vendor/model/emergency/privous_orders.dart'
+    as order;
 import 'package:sizer/sizer.dart';
 
 import '../../../../../../core/generated/locale_keys.g.dart';
@@ -17,9 +22,10 @@ class EmergencyMyOrderCard extends StatelessWidget {
   final String date;
   final String? location;
   final int orderNum;
-  final UserCar? car;
+  final offers.UserCar? car;
+  final order.UserCar? usercar;
   final VoidCallback onTap;
-  final List<Services>? services;
+  final List<update.Services>? services;
 
   const EmergencyMyOrderCard({
     super.key,
@@ -28,6 +34,7 @@ class EmergencyMyOrderCard extends StatelessWidget {
     required this.total,
     required this.orderNum,
     this.car,
+    this.usercar,
     required this.onTap,
     this.location,
     this.services,
@@ -150,9 +157,18 @@ class EmergencyMyOrderCard extends StatelessWidget {
                       width: 10,
                     ),
                     UtilValues.gap12,
-                    if (car != null)
+                    if (car != null )
                       Text(
                         '${car?.car?.model?.brand?.name} ${car?.car?.model?.name} ${car?.car?.year}',
+                        style: TextStyle(
+                            color: ColorsPalette.black,
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w500,
+                            fontFamily: ZainTextStyles.font),
+                      ),
+                    if (usercar != null )
+                      Text(
+                        '${usercar?.car?.model?.brand?.name} ${usercar?.car?.model?.name} ${usercar?.car?.year}',
                         style: TextStyle(
                             color: ColorsPalette.black,
                             fontSize: 12.sp,

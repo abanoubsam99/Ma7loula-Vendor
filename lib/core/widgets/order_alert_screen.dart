@@ -658,7 +658,8 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
     if (!mounted) return;
     if (!Navigator.canPop(context)) return;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // استخدام Future.delayed لتجنب تضارب Overlay
+    Future.delayed(const Duration(milliseconds: 100), () {
       if (!mounted) return;
       if (Navigator.canPop(context)) {
         Navigator.of(context).pop();

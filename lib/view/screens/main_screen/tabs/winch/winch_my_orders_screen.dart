@@ -257,6 +257,7 @@ class _WinchMyOrdersTabState extends State<WinchMyOrdersTab>
       textDirection:
           Helpers.isArabic(context) ? TextDirection.rtl : TextDirection.ltr,
       child: SafeArea(
+        bottom: false,
         child: DefaultTabController(
           length: categories.length,
           child: Scaffold(

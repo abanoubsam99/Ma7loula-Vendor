@@ -35,6 +35,7 @@ class EmergencyMapRoutePage extends StatefulWidget {
   final String vendorNum;
   final String vendorCar;
   final String location;
+  final String description;
   final User user;
 
   const EmergencyMapRoutePage({
@@ -52,6 +53,7 @@ class EmergencyMapRoutePage extends StatefulWidget {
     required this.vendorNum,
     required this.vendorCar,
     required this.location,
+    required this.description,
   }) : super(key: key);
 
   @override
@@ -62,6 +64,10 @@ class _EmergencyMapRoutePageState extends State<EmergencyMapRoutePage> {
   late GoogleMapController mapController;
   Set<Polyline> _polylines = {};
   Set<Marker> _markers = {};
+  
+  bool _isAcceptLoading = false;
+  bool _isRejectLoading = false;
+  bool _isUpdateLoading = false;
 
   @override
   void initState() {
@@ -185,7 +191,7 @@ class _EmergencyMapRoutePageState extends State<EmergencyMapRoutePage> {
             child: Align(
               alignment: AlignmentDirectional.bottomCenter,
               child: Container(
-                height: MediaQuery.of(context).size.height * .38,
+                height: MediaQuery.of(context).size.height * .4,
                 color: ColorsPalette.white,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
@@ -269,6 +275,37 @@ class _EmergencyMapRoutePageState extends State<EmergencyMapRoutePage> {
                       ],
                     ),
                     UtilValues.gap12,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: [
+                              Text(
+                                'description'.tr(),
+                                style: TextStyle(
+                                    color: ColorsPalette.black,
+                                    fontSize: 15.sp,
+                                    fontWeight: FontWeight.w700,
+                                    fontFamily: ZainTextStyles.font),
+                              ),
+                              Text(
+                                widget.description,
+                                style: TextStyle(
+                                    color: ColorsPalette.black,
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w500,
+                                    fontFamily: ZainTextStyles.font),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    UtilValues.gap12,
                     Builder(builder: (context) {
                       context
                           .read<GetEmergencyOffersProvider>()
@@ -280,6 +317,14 @@ class _EmergencyMapRoutePageState extends State<EmergencyMapRoutePage> {
                           Expanded(
                             child: SimplePrimaryButton(
                               borderRadius: BorderRadius.circular(5),
+                              isLoading: context
+                                          .watch<GetEmergencyOffersProvider>()
+                                          .listRequests
+                                          .data
+                                          ?.acceptedOffer !=
+                                      null
+                                  ? _isUpdateLoading
+                                  : _isAcceptLoading,
                               label: context
                                           .watch<GetEmergencyOffersProvider>()
                                           .listRequests
@@ -294,8 +339,8 @@ class _EmergencyMapRoutePageState extends State<EmergencyMapRoutePage> {
                                           .data
                                           ?.acceptedOffer !=
                                       null
-                                  ? updateOrder
-                                  : acceptOrder,
+                                  ? (_isUpdateLoading ? null : updateOrder)
+                                  : (_isAcceptLoading ? null : acceptOrder),
                             ),
                           ),
                           UtilValues.gap8,
@@ -307,11 +352,12 @@ class _EmergencyMapRoutePageState extends State<EmergencyMapRoutePage> {
                               ),
                               child: SimplePrimaryButton(
                                 borderRadius: BorderRadius.circular(5),
+                                isLoading: _isRejectLoading,
                                 label: context.watch<GetEmergencyOffersProvider>().listRequests.data?.acceptedOffer != null ?LocaleKeys.call.tr():LocaleKeys.reject.tr(),
                                 backgroundColor: ColorsPalette.white,
                                 labelColor: ColorsPalette.black,
                                 // onPressed: cancelOrder,
-                                onPressed: () {
+                                onPressed: _isRejectLoading ? null : () {
                                   final provider = context.read<GetEmergencyOffersProvider>();
                                   if (provider.listRequests.data?.acceptedOffer != null) {
                                     _callCustomer(provider.listRequests.data?.acceptedOffer?.user?.phone ?? "");
@@ -343,12 +389,23 @@ class _EmergencyMapRoutePageState extends State<EmergencyMapRoutePage> {
     await launchUrlString("tel://$vendorNum");
   }
   void cancelOrder() async {
+    if (_isRejectLoading) return;
+    
+    setState(() {
+      _isRejectLoading = true;
+    });
+    
     try {
       await MiscellaneousApi.rejectEmergencyOffer(
           locale: context.locale, orderId: widget.orderNum);
       await MiscellaneousApi.getEmergencyOffers(locale: context.locale);
 
-      setState(() {});
+      if (!mounted) return;
+      
+      setState(() {
+        _isRejectLoading = false;
+      });
+      
       showSnackbar(
         context: context,
         status: SnackbarStatus.success,
@@ -356,6 +413,12 @@ class _EmergencyMapRoutePageState extends State<EmergencyMapRoutePage> {
       );
       Navigator.pop(context);
     } catch (e) {
+      if (!mounted) return;
+      
+      setState(() {
+        _isRejectLoading = false;
+      });
+      
       showSnackbar(
         context: context,
         status: SnackbarStatus.error,
@@ -365,10 +428,22 @@ class _EmergencyMapRoutePageState extends State<EmergencyMapRoutePage> {
   }
 
   void acceptOrder() async {
+    if (_isAcceptLoading) return;
+    
+    setState(() {
+      _isAcceptLoading = true;
+    });
+    
     try {
       await MiscellaneousApi.sentEmergencyOffer(
           locale: context.locale, orderId: widget.orderNum);
-      setState(() {});
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _isAcceptLoading = false;
+      });
+      
       showSnackbar(
         context: context,
         status: SnackbarStatus.success,
@@ -376,6 +451,12 @@ class _EmergencyMapRoutePageState extends State<EmergencyMapRoutePage> {
       );
       // Navigator.pop(context);
     } catch (e) {
+      if (!mounted) return;
+      
+      setState(() {
+        _isAcceptLoading = false;
+      });
+      
       showSnackbar(
         context: context,
         status: SnackbarStatus.error,
@@ -385,10 +466,18 @@ class _EmergencyMapRoutePageState extends State<EmergencyMapRoutePage> {
   }
 
   void updateOrder() async {
+    if (_isUpdateLoading) return;
+    
+    setState(() {
+      _isUpdateLoading = true;
+    });
+    
     try {
       await MiscellaneousApi.updateOrderStatusEmergency(
           locale: context.locale, orderId: widget.orderNum);
 
+      if (!mounted) return;
+      
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) {
         return ServicesDetailsScreen(
           orderNum: widget.orderNum,
@@ -404,6 +493,12 @@ class _EmergencyMapRoutePageState extends State<EmergencyMapRoutePage> {
       );
       // Navigator.pop(context);
     } catch (e) {
+      if (!mounted) return;
+      
+      setState(() {
+        _isUpdateLoading = false;
+      });
+      
       showSnackbar(
         context: context,
         status: SnackbarStatus.error,

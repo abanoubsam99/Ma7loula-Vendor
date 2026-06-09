@@ -235,6 +235,7 @@ class _EmergencyMyOrdersTabState extends State<EmergencyMyOrdersTab>
       textDirection:
           Helpers.isArabic(context) ? TextDirection.rtl : TextDirection.ltr,
       child: SafeArea(
+        bottom: false,
         child: DefaultTabController(
           length: categories.length,
           child: Scaffold(
@@ -310,6 +311,8 @@ class _EmergencyMyOrdersTabState extends State<EmergencyMyOrdersTab>
                       total: order.total ?? 0,
                       orderNum: order.id ?? 0,
                       location: order.location.toString() ?? '',
+                      usercar: order.userCar,
+
                       onTap: () {
                         Navigator.push(context,
                             MaterialPageRoute(builder: (context) {
@@ -353,6 +356,7 @@ class _EmergencyMyOrdersTabState extends State<EmergencyMyOrdersTab>
                       return EmergencyMapRoutePage(
                         orderNum: acceptedOffer.id ?? 0,
                         user: acceptedOffer.user!,
+                        description: acceptedOffer.description!,
                         servicesPrice: acceptedOffer.servicesPrice ?? 0.0,
                         taxPrice: acceptedOffer.taxPrice ?? 0.0,
                         total: acceptedOffer.total ?? 0.0,
@@ -373,12 +377,14 @@ class _EmergencyMyOrdersTabState extends State<EmergencyMyOrdersTab>
                     total: acceptedOffer.total ?? 0,
                     orderNum: acceptedOffer.id ?? 0,
                     location: acceptedOffer.location ?? '',
+                    car: acceptedOffer.userCar ,
                     onTap: () {
                       Navigator.push(context,
                           MaterialPageRoute(builder: (context) {
                         return EmergencyMapRoutePage(
                           orderNum: acceptedOffer.id ?? 0,
                           user: acceptedOffer.user!,
+                          description: acceptedOffer.description!,
                           servicesPrice: acceptedOffer.servicesPrice ?? 0.0,
                           taxPrice: acceptedOffer.taxPrice ?? 0.0,
                           total: acceptedOffer.total ?? 0.0,
@@ -426,6 +432,7 @@ class _EmergencyMyOrdersTabState extends State<EmergencyMyOrdersTab>
                           return EmergencyMapRoutePage(
                             orderNum: order.id ?? 0,
                             user: order.user!,
+                            description: order.description!,
                             servicesPrice: order.servicesPrice ?? 0.0,
                             taxPrice: order.taxPrice ?? 0.0,
                             total: order.total ?? 0.0,
@@ -446,12 +453,14 @@ class _EmergencyMyOrdersTabState extends State<EmergencyMyOrdersTab>
                         total: order.total ?? 0,
                         orderNum: order.id ?? 0,
                         location: order.location ?? '',
+                        car: order.userCar ,
                         onTap: () {
                           Navigator.push(context,
                               MaterialPageRoute(builder: (context) {
                             return EmergencyMapRoutePage(
                               orderNum: order.id ?? 0,
                               user: order.user!,
+                              description: order.description!,
                               servicesPrice: order.servicesPrice ?? 0.0,
                               taxPrice: order.taxPrice ?? 0.0,
                               total: order.total ?? 0.0,

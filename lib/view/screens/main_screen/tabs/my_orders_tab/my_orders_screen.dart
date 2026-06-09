@@ -157,6 +157,7 @@ class _MyOrdersTabState extends State<MyOrdersTab>
       textDirection:
           Helpers.isArabic(context) ? TextDirection.rtl : TextDirection.ltr,
       child: SafeArea(
+        bottom: false,
         child: DefaultTabController(
           length: categories.length,
           child: Scaffold(
