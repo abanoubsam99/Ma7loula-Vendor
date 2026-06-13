@@ -9,6 +9,8 @@ const String registerEndPoint = 'bt-vendor/register';
 const String otpEndPoint = 'auth/send-otp';
 const String verifyOtpEndPoint = 'auth/verify-otp';
 const String getProfileEndPoint = 'bt-vendor/user-profile';
+// ⚠️ راجِع هذا المسار مع الـ backend — يُستخدم لتحديث الـ FCM token تلقائياً
+const String updateFcmTokenEndPoint = 'auth/update-fcm-token';
 const String resetPasswordEndPoint = 'auth/reset-password';
 const String updatePasswordEndPoint = 'auth/update-password';
 const String updateProfileEndPoint = 'auth/update-profile';

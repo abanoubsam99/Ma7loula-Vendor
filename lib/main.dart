@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:form_builder_validators/localization/l10n.dart';
 import 'package:provider/provider.dart';
@@ -72,6 +73,10 @@ void main() async {
   await EasyLocalization.ensureInitialized();
   EasyLocalization.logger.enableBuildModes = [];
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // لازم يتسجّل مبكّراً جداً (قبل runApp) عشان يشتغل والتطبيق مقفول/في الخلفية
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
   NotificationsHelper().initialize();
   runApp(
     EasyLocalization(

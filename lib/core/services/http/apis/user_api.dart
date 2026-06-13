@@ -20,6 +20,27 @@ import '../interceptors/api_interceptor.dart';
 import 'exceptions/api_exception.dart';
 
 class UserApi {
+  /// تحديث الـ FCM token على السيرفر للمستخدم الحالي (عند تجديد الـ token
+  /// أو عند بدء التشغيل). لا يُرسَل إلا إذا كان المستخدم مسجّل دخول.
+  /// ⚠️ راجِع مسار updateFcmTokenEndPoint مع الـ backend.
+  static Future<void> updateFcmToken({required String token}) async {
+    final authToken = await SecureStorageService.instance
+        .readString(key: SecureStorageKeys.token);
+    if (authToken == null || authToken.isEmpty) return;
+
+    await ApiClient.instance.dio.post(
+      updateFcmTokenEndPoint,
+      data: {
+        "fcm_token": token,
+        "platform": Platform.isAndroid ? "Android" : "IOS",
+      },
+      options: Options(headers: {
+        'Authorization': 'Bearer $authToken',
+      }),
+    );
+    log("FCM token updated on server");
+  }
+
   static Future<UserModel> login({
     required String? phone,
     required String? password,

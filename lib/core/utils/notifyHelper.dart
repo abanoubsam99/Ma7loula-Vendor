@@ -6,7 +6,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import '../../firebase_options.dart';
+// عند تفعيل تحديث الـ token تلقائياً، أعِد استيراد:
+// import '../services/http/apis/user_api.dart';
 import '../widgets/order_alert_screen.dart';
+import 'package:ma7lola_vendor/view/screens/main_screen/tabs/winch/winch_order_details_screen.dart';
+import 'package:ma7lola_vendor/view/screens/main_screen/tabs/emergency/emergency_order_details_screen.dart';
+import 'package:ma7lola_vendor/view/screens/main_screen/tabs/my_orders_tab/order_details_screen.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -197,26 +202,39 @@ class NotificationsHelper {
     // Handle incoming notifications when the app is in the foreground
     FirebaseMessaging.onMessage.listen(_handleIncomingNotification);
 
-    // Handle background messages (when app is closed or in background)
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    // ملاحظة: onBackgroundMessage يتم تسجيله في main() قبل runApp مباشرة
+    // عشان يشتغل والتطبيق مقفول تماماً.
+
     // Handle when notification is tapped
     FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationOpenedApp);
+
+    // تحديث الـ token تلقائياً عند تجديده وإرساله للسيرفر
+    FirebaseMessaging.instance.onTokenRefresh.listen(_syncFcmToken);
   }
 
-  /// Handle when notification is opened from background
+  /// Handle when notification is opened from background (عند الضغط على الإشعار)
   void _handleNotificationOpenedApp(RemoteMessage message) {
     print("📱 فتح التطبيق من الإشعار: ${message.data}");
-    if (!_isActionableAlert(message.data)) return;
-    _pendingAlertData = Map<String, dynamic>.from(message.data);
-    _openAlertFromData(message.data);
+    if (message.data.isEmpty) return;
+    _openDetailsAndAlertFromData(message.data);
   }
 
+  /// هل يستحق هذا الإشعار فتح شاشة التنبيه الكاملة؟
+  /// - ونش/طوارئ: عند طلب جديد (new) أو بعد قبول العميل (accepted/preparing/on_the_run)
+  /// - قطع غيار/إطارات/بطاريات: الطلبات الجديدة فقط (new)
   static bool _isActionableAlert(Map<String, dynamic> data) {
     if (data.isEmpty) return false;
-    final status = data['status']?.toString();
-    return status == 'new' ||
-        status == 'pending_customer' ||
-        status == 'offer_pending';
+    final status = data['status']?.toString() ?? '';
+    final type = data['type']?.toString() ?? '';
+    final isWinchOrEmergency = type == 'winch' || type == 'emergency';
+
+    if (isWinchOrEmergency) {
+      return status == 'new' ||
+          status == 'accepted' ||
+          status == 'preparing' ||
+          status == 'on_the_run';
+    }
+    return status == 'new';
   }
 
   static String _alertDedupeKey(Map<String, dynamic> data) {
@@ -248,49 +266,114 @@ class NotificationsHelper {
     });
   }
 
+  /// عند الضغط على الإشعار: نفتح صفحة التفاصيل المناسبة للنوع،
+  /// وفوقها شاشة التنبيه (لو الطلب يتطلب إجراء). إغلاق التنبيه يرجّع للتفاصيل.
+  void _openDetailsAndAlertFromData(Map<String, dynamic> data) {
+    if (data.isEmpty) return;
+    _pendingAlertData = Map<String, dynamic>.from(data);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _navigateToDetails(data);
+      if (_isActionableAlert(data)) {
+        showFullScreenOrderAlert(data);
+      }
+    });
+  }
+
+  /// التنقل لصفحة تفاصيل الطلب حسب نوع الخدمة
+  static void _navigateToDetails(Map<String, dynamic> data) {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
+    final nd = NotificationData.fromMap(data);
+    final type = nd.type;
+    final isWinchOrEmergency = type == 'winch' || type == 'emergency';
+
+    // ونش/طوارئ يستخدمان order_id، أما قطع الغيار فتستخدم order_vendor_id
+    final id = isWinchOrEmergency
+        ? (int.tryParse(nd.orderId) ?? int.tryParse(nd.orderVendorId))
+        : (int.tryParse(nd.orderVendorId) ?? int.tryParse(nd.orderId));
+    if (id == null) return;
+
+    final phone = nd.customerPhone ?? '';
+    Widget? page;
+    switch (type) {
+      case 'winch':
+        page = WinchOrderDetails(orderNum: id, userNum: phone, vendorName: '');
+        break;
+      case 'emergency':
+        page =
+            EmergencyOrderDetails(orderNum: id, vendorNum: phone, vendorName: '');
+        break;
+      case 'battery':
+        page = OrderDetails(orderNum: id, orderType: 0);
+        break;
+      case 'tire':
+        page = OrderDetails(orderNum: id, orderType: 1);
+        break;
+      case 'car-parts':
+        page = OrderDetails(orderNum: id, orderType: 2);
+        break;
+    }
+    if (page == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => page!),
+    );
+  }
+
   /// Handle incoming FCM notifications when the app is in the foreground
   void _handleIncomingNotification(RemoteMessage message) {
     processIncomingMessage(message, showFullScreen: true);
   }
 
-  /// معالجة الإشعار الوارد (foreground / background)
+  /// معالجة الإشعار الوارد (foreground / background / مغلق)
   Future<void> processIncomingMessage(
     RemoteMessage message, {
     bool showFullScreen = false,
   }) async {
-    if (message.data.isEmpty || !_shouldProcessAlert(message.data)) return;
+    // لا نتجاهل إلا الرسائل الفارغة تماماً
+    if (message.data.isEmpty && message.notification == null) return;
 
-    final title = message.notification?.title ??
-        message.data['title']?.toString() ??
-        'طلب توصيل جديد 🚨';
-    final body = message.notification?.body ??
-        message.data['body']?.toString() ??
-        'لديك إشعار جديد يحتاج انتباهك';
-    final type = _resolveNotificationType(message.data, title, body);
-
-    _pendingAlertData = Map<String, dynamic>.from(message.data);
-
+    final data = message.data;
+    final actionable = _isActionableAlert(data);
     final hasContext = navigatorKey.currentContext != null;
 
-    // التطبيق مفتوح: افتح صفحة التنبيه مباشرة (صوت واهتزاز من الشاشة نفسها)
-    if (showFullScreen && hasContext) {
-      _openAlertFromData(message.data);
+    if (data.isNotEmpty) {
+      _pendingAlertData = Map<String, dynamic>.from(data);
+    }
+
+    // التطبيق مفتوح + تنبيه طلب فعلي: افتح صفحة التنبيه مباشرة
+    // (الصوت والاهتزاز من الشاشة نفسها، بدون إشعار في الشريط)
+    if (showFullScreen && hasContext && actionable) {
+      if (_shouldProcessAlert(data)) {
+        _openAlertFromData(data);
+      }
       return;
     }
 
-    // الخلفية: إشعار واحد فقط — لا نكرر إذا FCM عرض الإشعار بالفعل
+    final title = message.notification?.title ??
+        data['title']?.toString() ??
+        'طلب توصيل جديد 🚨';
+    final body = message.notification?.body ??
+        data['body']?.toString() ??
+        'لديك إشعار جديد يحتاج انتباهك';
+    final type = _resolveNotificationType(data, title, body);
+
+    // الخلفية/مغلق: اعرض إشعاراً في الشريط لكل رسالة واردة
+    // (لا نكرر إذا كان FCM عرض الإشعار بالفعل من خلال notification payload)
     final fcmAlreadyDisplayed = message.notification != null;
     if (!fcmAlreadyDisplayed) {
       await _showHighPriorityNotification(
         title,
         body,
         type,
-        alertData: message.data,
+        alertData: data,
       );
     }
 
-    if (hasContext) {
-      _openAlertFromData(message.data);
+    // لو التطبيق رجع للواجهة (background غير مغلق) وفيه تنبيه فعلي افتح الشاشة
+    if (hasContext && actionable && _shouldProcessAlert(data)) {
+      _openAlertFromData(data);
     }
   }
 
@@ -570,11 +653,11 @@ class NotificationsHelper {
     );
   }
 
-  /// معالجة النقر على الإشعار — فتح صفحة التنبيه
+  /// معالجة النقر على الإشعار المحلي — فتح صفحة التفاصيل + التنبيه
   void _onNotificationTapped(NotificationResponse response) {
     final alertData = _decodeNotificationPayload(response.payload);
     if (alertData == null || alertData.isEmpty) return;
-    _openAlertFromData(alertData);
+    _openDetailsAndAlertFromData(alertData);
   }
 
   // /// Background message handler (to handle notifications when the app is in the background)
@@ -585,12 +668,28 @@ class NotificationsHelper {
   //   }
   // }
 
-  /// Get FCM token (optional, can be used to store or use the token in your app)
-  static Future<String?> _getFCMToken() async {
+  /// Get FCM token ويرسله للسيرفر إذا كان المستخدم مسجّلاً
+  Future<String?> _getFCMToken() async {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
     String? token = await messaging.getToken();
     print("FCM Token: $token");
+    await _syncFcmToken(token);
     return token;
+  }
+
+  /// إرسال الـ FCM token للسيرفر عند تجديده تلقائياً.
+  ///
+  /// ⚠️ لا يوجد endpoint في الباك حالياً لتحديث الـ token بشكل مستقل.
+  /// الـ token يُرسَل وقت تسجيل الدخول فقط (UserApi.login -> "fcm_token").
+  /// بمجرد إضافة endpoint في الباك، فعّل السطر داخل try أدناه فقط.
+  Future<void> _syncFcmToken(String? token) async {
+    if (token == null || token.isEmpty) return;
+    print('🔄 FCM token تجدّد: $token');
+    // try {
+    //   await UserApi.updateFcmToken(token: token);
+    // } catch (e) {
+    //   print('⚠️ تعذّر تحديث FCM token على السيرفر: $e');
+    // }
   }
 
   /// Unsubscribe from topic (optional, if you are using FCM topics)

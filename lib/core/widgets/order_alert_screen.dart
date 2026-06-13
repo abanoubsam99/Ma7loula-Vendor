@@ -268,8 +268,8 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   int _remainingSeconds = 30;
   bool _isAccepting = false;
   bool _isRejecting = false;
-  bool _offerAccepted = false;
   bool _isClosing = false;
+  bool _alarmStopped = false;
 
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
@@ -281,18 +281,16 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
       _displayType == 'car-parts' ||
       _displayType == 'battery';
 
-  /// مرحلة التسليم/الإنهاء بعد القبول (ونش وطوارئ)
+  /// مرحلة التسليم/الإنهاء — تظهر فقط بعد ما العميل يقبل العرض
+  /// (الحالات: accepted / preparing / on_the_run).
+  /// أما new فهي مرحلة "إرسال العرض"، و offer_pending / pending_customer
+  /// تعني "العرض اتبعت ومستني العميل" — ليست مرحلة تسليم.
   bool get _showDeliverPhase {
     if (!_isWinchOrEmergency) return false;
-    if (_offerAccepted) return true;
+    const deliverStatuses = {'accepted', 'preparing', 'on_the_run'};
     final vendorStatus = widget.notificationData?.orderVendorStatus ?? '';
-    return vendorStatus == 'accepted' ||
-        vendorStatus == 'preparing' ||
-        vendorStatus == 'on_the_run' ||
-        _displayStatus == 'accepted' ||
-        _displayStatus == 'preparing' ||
-        _displayStatus == 'offer_pending' ||
-        _displayStatus == 'pending_customer';
+    return deliverStatuses.contains(vendorStatus) ||
+        deliverStatuses.contains(_displayStatus);
   }
 
   int? _tryParseId(String? value) {
@@ -420,14 +418,27 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
   }
 
   void _stopAlarmSound() {
-    _audioPlayer.stop();
-    _audioPlayer.dispose();
+    if (_alarmStopped) return;
+    _alarmStopped = true;
+    try {
+      _audioPlayer.stop();
+      _audioPlayer.dispose();
+    } catch (_) {}
   }
 
   void _handleTimeout() {
-    _stopAlarmSound();
-    _countdownTimer.cancel();
+    if (_countdownTimer.isActive) _countdownTimer.cancel();
     debugPrint('⏰ انتهى الوقت للطلب: $_displayOrderId');
+
+    // في مرحلة التسليم (ونش/طوارئ بعد القبول) لا نغلق الشاشة،
+    // فقط نوقف صوت الإنذار لأن المندوب لسه شغّال على الطلب.
+    if (_showDeliverPhase) {
+      _stopAlarmSound();
+      return;
+    }
+
+    // باقي الحالات: انتهى الوقت بدون تفاعل → اغلق التنبيه تلقائياً
+    _closeAlert();
   }
 
   Future<void> updatePriceOrder(num offered_total) async {
@@ -502,11 +513,10 @@ class _OrderAlertScreenState extends State<OrderAlertScreen>
             );
           }
           if (mounted) {
-            setState(() {
-              _isAccepting = false;
-              _offerAccepted = true;
-            });
-            _showSuccessSnackBar(LocaleKeys.done.tr());
+            // تم إرسال العرض بنجاح → نغلق التنبيه.
+            // مرحلة التسليم هتظهر في إشعار جديد لما العميل يقبل العرض.
+            setState(() => _isAccepting = false);
+            _closeAlertOnSuccess();
           }
         }
         return;
