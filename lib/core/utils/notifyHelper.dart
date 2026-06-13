@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../firebase_options.dart';
 // عند تفعيل تحديث الـ token تلقائياً، أعِد استيراد:
 // import '../services/http/apis/user_api.dart';
@@ -57,11 +58,26 @@ class NotificationsHelper {
     await _initializeFirebase();
     await _initializeLocalNotifications();
 
+    // طلب إعفاء من تحسين البطارية — يساعد على استمرار وصول الإشعارات
+    // على أجهزة OEM (شاومي/أوبو/هواوي...) التي تقتل التطبيقات في الخلفية.
+    await _requestBatteryOptimizationExemption();
+
     // Setup Firebase Cloud Messaging (FCM) listeners for incoming messages
     _setupFCMListeners();
 
     // Get FCM token (optional, if you want to store or use it)
     await _getFCMToken();
+  }
+
+  /// طلب استثناء التطبيق من تحسين البطارية (مرة واحدة طالما مرفوض)
+  Future<void> _requestBatteryOptimizationExemption() async {
+    try {
+      if (await Permission.ignoreBatteryOptimizations.isDenied) {
+        await Permission.ignoreBatteryOptimizations.request();
+      }
+    } catch (e) {
+      print('⚠️ تعذّر طلب إعفاء تحسين البطارية: $e');
+    }
   }
 
   /// يُستدعى بعد أول إطار عندما يكون الـ Navigator جاهزاً

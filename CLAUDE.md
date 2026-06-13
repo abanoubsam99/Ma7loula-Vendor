@@ -38,7 +38,9 @@ Two layers: **FCM** (Firebase Cloud Messaging) for transport + **flutter_local_n
   - `winch` → `WinchOrderDetails`, `emergency` → `EmergencyOrderDetails`, `battery/tire/car-parts` → `OrderDetails(orderType: 0/1/2)`.
 
 ### ⚠️ Known constraint — notifications when app is killed/terminated
-This is a **platform limitation, not a code bug**: when the app is force-killed (swiped from recents), Android does **not** deliver data-only FCM messages until the app reopens. The only reliable fix is **backend-side**: send a `notification` block (not data-only) with `android.priority = HIGH`. Then Google Play Services displays it without waking the app. See [order-alert-status-model](#) discussions in memory.
+This is a **platform limitation, not a code bug**: when the app is force-killed (swiped from recents), Android does **not** deliver data-only FCM messages until the app reopens. The only reliable fix is **backend-side**: send a `notification` block (not data-only) with `android.priority = HIGH`. Then Google Play Services displays it without waking the app.
+
+Client-side mitigations already in place: background handler registered before `runApp`; `_requestBatteryOptimizationExemption()` in `initialize()` (needs `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` in manifest) to survive OEM battery killers (Xiaomi/Oppo/Huawei). These help but **cannot** substitute for a `notification`-type payload from the backend. Diagnostic: a Firebase Console "test message" (which is a notification message) arriving while the app is killed proves the client is correct and the backend send-code is the culprit.
 
 ### ⚠️ FCM token refresh
 The backend has **no endpoint to update the FCM token** independently — token is sent only at **login** (`fcm_token` field). `_syncFcmToken` (on `onTokenRefresh`) currently only logs; the real `UserApi.updateFcmToken` call + import are left commented, ready to enable once a backend endpoint exists. A rotated token mid-session can stop notifications until next login.
