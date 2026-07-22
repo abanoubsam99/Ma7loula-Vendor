@@ -58,12 +58,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCJDeswaNtUoh5Pqk-Xc55mWoHOFgSdroM',
-    appId: '1:160217474119:android:45dd3b6afcccc362defd62',
+    appId: '1:160217474119:android:3ae088594c3feafddefd62',
     messagingSenderId: '160217474119',
     projectId: 'ma7lola-75b28',
     storageBucket: 'ma7lola-75b28.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCdsTVFzMyuWRUJVvvh0fWqPs-UxcMgtZ8',
     appId: '1:160217474119:ios:7708f6282e856999defd62',
@@ -72,5 +71,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'ma7lola-75b28.firebasestorage.app',
     iosBundleId: 'com.ma7lola.ma7lolaVendor',
   );
-
 }
